@@ -84,6 +84,26 @@ class DriftThresholds(BaseModel):
     performance_decay_critical: float = 0.10
 
 
+def _apply_env_overrides(raw: dict) -> dict:
+    """Overlay env vars onto a raw reporter config dict before validation."""
+    import os
+    env = os.environ.get
+
+    raw.setdefault("data", {}).setdefault("raw", {})
+    if v := env("DATA_RAW_UNSW_DIR"):
+        raw["data"]["raw"]["unsw_nb15_dir"] = v
+    if v := env("DATA_RAW_CICIOT_DIR"):
+        raw["data"]["raw"]["ciciot2023_dir"] = v
+    if v := env("DATA_BALANCED_DIR"):
+        raw["data"]["balanced_dir"] = v
+    if v := env("DATA_BLACKLIST_PATH"):
+        raw["data"]["blacklist"] = v
+    raw.setdefault("model_api", {})
+    if v := env("MODEL_API_URL"):
+        raw["model_api"]["base_url"] = v
+    return raw
+
+
 class ReporterConfig(BaseModel):
     data: DataPaths
     model_api: ModelAPIConfig
@@ -98,14 +118,14 @@ class ReporterConfig(BaseModel):
     def from_yaml(cls, path: Path | str) -> "ReporterConfig":
         with open(path) as fh:
             raw = yaml.safe_load(fh)
-        return cls.model_validate(raw)
+        return cls.model_validate(_apply_env_overrides(raw))
 
     @classmethod
     def from_json(cls, path: Path | str) -> "ReporterConfig":
         import json
         with open(path) as fh:
             raw = json.load(fh)
-        return cls.model_validate(raw)
+        return cls.model_validate(_apply_env_overrides(raw))
 
 
 # ===========================================================================

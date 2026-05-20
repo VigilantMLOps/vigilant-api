@@ -1,114 +1,113 @@
-# Backend — VigilantMLOps
+# Vigilant API
 
-FastAPI service for ML monitoring, drift detection, and alerting.
+FastAPI backend for the Vigilant MLOps platform. Provides endpoints for ML model monitoring, pre-production evaluation, real-time feature drift detection (PSI / KS / Chi²), incident management, and system health.
 
----
+## Tech Stack
 
-## Setup
+- **Python 3.12** + **FastAPI** + **Uvicorn**
+- **DuckDB** — embedded persistence (reports, incidents, alerts, feature stats)
+- **Polars** — data processing
+- **scikit-learn / scipy / numpy** — ML evaluation and drift statistics
+- **Poetry** — dependency management
 
-**1. Create and activate a virtual environment**
+## API Reference
+
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/health` | Service health check |
+| `GET` | `/api/v1/reports/latest` | Most recent evaluation report |
+| `GET` | `/api/v1/reports/history` | Last 10 evaluation reports |
+| `POST` | `/api/v1/reporter/evaluate-data` | Run data evaluation on all splits |
+| `POST` | `/api/v1/reporter/evaluate-model` | Run model evaluation against model API |
+| `POST` | `/api/v1/reporter/evaluate-drift` | Run feature drift detection |
+| `DELETE` | `/api/v1/reporter/production-log` | Reset production log |
+| `GET` | `/api/v1/reporter/feature-stats` | Export baseline feature statistics |
+| `GET` | `/api/v1/reporter/model-health` | Proxy model API health check |
+
+Interactive docs available at `/docs` (Swagger) and `/redoc`.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8000` | Port uvicorn listens on |
+| `CORS_ORIGINS` | `*` | Comma-separated allowed CORS origins. Use `*` to allow all |
+| `MODEL_API_URL` | `http://model-api:8001` | Base URL of the model inference API |
+| `VIGILANT_DB_PATH` | `core/database/vigilant.db` | Path to the DuckDB database file |
+| `DATA_RAW_UNSW_DIR` | `/data/raw/UNSW-NB15` | UNSW-NB15 raw CSV directory |
+| `DATA_RAW_CICIOT_DIR` | `/data/raw/CICIoT2023` | CICIoT2023 raw CSV directory |
+| `DATA_BALANCED_DIR` | `/data/processed/balanced` | Balanced/processed parquet directory |
+| `DATA_BLACKLIST_PATH` | `/data/ip_blacklists/blacklist.parquet` | IP blacklist parquet file |
+
+## Docker
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+docker build -t vigilant-api .
+
+docker run -p 8000:8000 \
+  -e MODEL_API_URL=http://your-model-api:8001 \
+  -e CORS_ORIGINS=https://your-ui.example.com \
+  -v /host/path/to/data:/data \
+  -v vigilant-db:/app/core/database \
+  vigilant-api
 ```
 
-**2. Install dependencies**
+Data is expected to be mounted at `/data/` with the following layout:
+
+```
+/data/
+├── raw/
+│   ├── UNSW-NB15/          # override with DATA_RAW_UNSW_DIR
+│   └── CICIoT2023/         # override with DATA_RAW_CICIOT_DIR
+├── processed/
+│   └── balanced/           # override with DATA_BALANCED_DIR
+└── ip_blacklists/
+    └── blacklist.parquet   # override with DATA_BLACKLIST_PATH
+```
+
+## Local Development
 
 ```bash
-pip install -r requirements.txt
+poetry install
+poetry run uvicorn main:app --reload
 ```
 
-> The project uses `pyproject.toml` / `poetry.lock` as the source of truth. If you use Poetry: `poetry install`.
+The server starts at `http://localhost:8000`. Set `MODEL_API_URL` if you need model evaluation endpoints.
 
-**3. Run the development server**
+## Running Tests
 
 ```bash
-make dev-backend
+poetry run pytest
 ```
 
-This starts the FastAPI app with hot reload at `http://localhost:8000`.
+## Initializing the Baseline
 
----
+Run once (with the backend stopped) to compute per-feature statistics from a training file and store them in DuckDB:
+
+```bash
+poetry run python scripts/init_baseline.py --input /path/to/training.parquet
+```
 
 ## The 3 Pillars
 
-### 1. Drift Detection
-Monitors statistical shifts between the training reference distribution and incoming production data. Uses PSI (Population Stability Index) and the KS-test to detect when feature distributions have changed enough to invalidate model assumptions.
+**Drift Detection** — monitors statistical shifts between training reference distribution and incoming production data using PSI, KS-test, and Chi² test.
 
-### 2. Performance Monitoring
-Tracks model quality over time — accuracy, F1, precision, recall, and confusion matrix deltas. Flags performance decay when live metrics fall below thresholds relative to the pre-production baseline.
+**Performance Monitoring** — tracks accuracy, F1, precision, recall, and confusion matrix deltas over time. Alerts on decay relative to the pre-production baseline.
 
-### 3. System Health
-Monitors infrastructure-level signals: API latency, throughput, and schema consistency. Detects issues like slow DB queries or unexpected schema skew before they affect model outputs.
+**System Health** — monitors API latency and schema consistency via middleware. Triggers alerts on slow requests (>500ms) and 5xx errors.
 
----
+## Alerting Procedures
 
-## Procedures
+Defined in `core/procedures.yaml`. Low-risk incidents auto-resolve; high-risk ones create tickets for human review.
 
-Procedures are defined in [core/procedures.yaml](core/procedures.yaml) and govern how the alerting engine responds to each incident type.
+| Incident | Risk | Behavior |
+|---|---|---|
+| `system_latency` | Low | Auto-resolves (re-fetches DB) |
+| `schema_skew` | Low | Auto-resolves (refreshes schema) |
+| `data_drift` | High | Creates incident ticket |
+| `performance_drop` | High | Creates incident ticket |
 
-```yaml
-procedures:
-  system_latency:
-    action: "REFETCH_DB"
-    risk: "low"
-    auto_trigger: true
-  schema_skew:
-    action: "REFETCH_SCHEMA"
-    risk: "low"
-    auto_trigger: true
-  data_drift:
-    action: "TICKET_ONLY"
-    risk: "high"
-    auto_trigger: false
-  performance_drop:
-    action: "TICKET_ONLY"
-    risk: "high"
-    auto_trigger: false
-```
-
-| Risk Level | Behavior |
-|---|---|
-| **Low** | `auto_trigger: true` — the system resolves automatically (e.g. re-fetches data or refreshes schema). No human intervention required. |
-| **High** | `auto_trigger: false` — a ticket is created in the `incidents` table and escalated for human review. The system does not self-heal. |
-
----
-
-## Testing
-
-**Run all tests (unit + E2E)**
-
-```bash
-make test
-```
-
-Test files live under `tests/`:
-
-| File | Coverage |
-|---|---|
-| `test_endpoints.py` | API route responses |
-| `test_reporter_logic.py` | Report generation logic |
-| `test_performance.py` | Performance service metrics |
-| `test_alerting.py` | Alerting engine threshold logic |
-| `test_infra.py` | System health checks |
-| `test_e2e_flow.py` | Full end-to-end pipeline |
-
----
-
-## Database Management
-
-The DB is a local DuckDB file managed by `core/db_manager.py`. Use the following make targets:
-
-| Command | Description |
-|---|---|
-| `make db-init` | Apply any pending migrations (idempotent — safe to run repeatedly) |
-| `make db-reset` | Drop all tables and re-apply all migrations from scratch |
-| `make db-status` | Show applied migration history and any pending versions |
-
-The DB path defaults to `core/database/vigilant.db` and can be overridden with the `VIGILANT_DB_PATH` environment variable.
-
-**Schema overview** (v1 migration):
+## Database Schema
 
 | Table | Purpose |
 |---|---|
@@ -117,14 +116,16 @@ The DB path defaults to `core/database/vigilant.db` and can be overridden with t
 | `production_log` | Incoming feature data from live traffic |
 | `alerts` | Alert messages with severity metadata |
 
----
+## Project Structure
 
-## Seeding
-
-To populate the DB with synthetic evaluation data for local development:
-
-```bash
-make seed
 ```
-
-This runs the full pipeline: `evaluate-data → evaluate-model → evaluate-drift` across 3 batches. Individual stages can be skipped with `ARGS="--skip <stage>"`.
+api/v1/          # Route handlers (incidents, monitoring, reporter, telemetry)
+config/          # reporter.json — default reporter configuration
+core/
+├── database/    # DuckDB connection, schema, seed data
+├── logger.py    # Loguru-based logger
+└── ml_engine/   # Schema validation engine
+services/        # Business logic (alerting, drift detection, reporting, etc.)
+scripts/         # One-off operational scripts (init_baseline.py)
+tests/           # pytest test suite
+```

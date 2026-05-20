@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
 from pathlib import Path
@@ -32,7 +33,7 @@ _logger = get_logger("vigilant.init_baseline")
 
 _SCHEMA_PATH = Path(__file__).resolve().parent.parent / "core" / "ml_engine" / "schema.yaml"
 _NUM_BINS = 50
-_BACKEND_PORT = 8000
+_BACKEND_PORT = int(os.getenv("PORT", "8000"))
 
 
 def _assert_backend_down() -> None:

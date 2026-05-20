@@ -1,10 +1,11 @@
 """VigilantMLOps — FastAPI application entry point.
 
 Run with:
-    uvicorn main:app --reload          (from apps/backend/)
+    uvicorn main:app --reload
 """
 from __future__ import annotations
 
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -91,10 +92,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",")] if _cors_origins_raw != "*" else ["*"]
+
 app.add_middleware(SystemHealthMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

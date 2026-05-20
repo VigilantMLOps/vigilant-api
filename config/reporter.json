@@ -1,14 +1,14 @@
 {
   "data": {
     "raw": {
-      "unsw_nb15_dir": "/Users/macbook/Documents/GitHub/vigilant-mlops/artifacts/data/raw/UNSW-NB15",
-      "ciciot2023_dir": "/Users/macbook/Documents/GitHub/vigilant-mlops/artifacts/data/raw/CICIoT2023"
+      "unsw_nb15_dir": "/data/raw/UNSW-NB15",
+      "ciciot2023_dir": "/data/raw/CICIoT2023"
     },
-    "balanced_dir": "/Users/macbook/Documents/GitHub/vigilant-mlops/artifacts/data/processed/balanced",
-    "blacklist": "/Users/macbook/Documents/GitHub/vigilant-mlops/artifacts/data/ip_blacklists/blacklist.parquet"
+    "balanced_dir": "/data/processed/balanced",
+    "blacklist": "/data/ip_blacklists/blacklist.parquet"
   },
   "model_api": {
-    "base_url": "http://localhost:8001",
+    "base_url": "http://model-api:8001",
     "predict_endpoint": "/predict",
     "health_endpoint": "/health",
     "timeout_seconds": 300,
