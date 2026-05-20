@@ -1,0 +1,117 @@
+model:
+  name: "vigilant-nids-cnn-lstm"
+  version: "1.0.0"
+  task: "binary_classification"
+  description: >
+    Hybrid CNN-LSTM Network Intrusion Detection model trained on a
+    balanced merge of UNSW-NB15 and CICIoT2023 datasets.
+  target_column: "target"
+  label_map:
+    0: "benign"
+    1: "attack"
+
+# ---------------------------------------------------------------------------
+# Feature definitions — drives SchemaValidator.validate_input()
+# ---------------------------------------------------------------------------
+features:
+  numeric:
+    flow_duration:
+      type: float
+      min: 0.0
+      max: 255.0
+      description: "Total flow duration (seconds)"
+
+    bytes_total:
+      type: float
+      min: 0.0
+      max: 44623.0
+      description: "Total bytes transferred across both directions"
+
+    pkts_total:
+      type: float
+      min: 1.0
+      max: 209.0
+      description: "Total packet count across both directions"
+
+    rate:
+      type: float
+      min: 0.0
+      max: 8388608.0   # 2^23 — hard ceiling from CICIoT2023
+      description: "Aggregate flow packet rate (pkts/sec)"
+
+    srate:
+      type: float
+      min: 0.0
+      max: 8388608.0
+      description: "Source-to-destination packet rate (pkts/sec)"
+
+    drate:
+      type: float
+      min: 0.0
+      max: 30.0
+      description: "Destination-to-source packet rate (pkts/sec)"
+
+    min:
+      type: float
+      min: 0.0
+      max: 11650.0
+      description: "Minimum packet size in flow (bytes)"
+
+    max:
+      type: float
+      min: 0.0
+      max: 34818.0
+      description: "Maximum packet size in flow (bytes)"
+
+    avg:
+      type: float
+      min: 0.0
+      max: 11650.0
+      description: "Mean packet size in flow (bytes)"
+
+    std:
+      type: float
+      min: 0.0
+      max: 9200.0
+      description: "Standard deviation of packet size in flow (bytes)"
+
+    proto:
+      type: float
+      min: 0.0
+      max: 1.0
+      nullable: true
+      description: >
+        Protocol identifier encoded as a numeric ratio (CICIoT2023).
+        The UNSW-NB15 sentinel value 'na' is coerced to 0.0 at inference time.
+
+  categorical:
+    state:
+      type: string
+      categories:
+        - "ACC"   # Connection accepted
+        - "CLO"   # Connection closed
+        - "CON"   # Connected / ongoing
+        - "ECO"   # Echo
+        - "ECR"   # Echo reply
+        - "FIN"   # Finished
+        - "INT"   # Internal
+        - "MAS"   # Master
+        - "PAR"   # Partial
+        - "REQ"   # Request
+        - "RST"   # Reset
+        - "TST"   # Test
+        - "TXD"   # Transmitted
+        - "URH"   # Urgent header
+        - "URN"   # Unrecognized
+        - "na"    # CICIoT2023 sentinel (no connection state available)
+        - "-"     # UNSW-NB15 raw sentinel (treated as 'na' by the preprocessor)
+      description: "TCP/UDP connection state indicator"
+
+# ---------------------------------------------------------------------------
+# Validation behaviour
+# ---------------------------------------------------------------------------
+validation:
+  allow_extra_fields: false   # warn (not reject) when unknown columns are present
+  coerce_types: true          # attempt float() cast before raising a type error
+  null_strategy: "fill_zero"  # fill_zero | reject | passthrough
+  out_of_range: "warn"        # warn | reject — what to do when a value exceeds min/max

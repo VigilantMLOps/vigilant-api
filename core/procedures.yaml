@@ -1,0 +1,17 @@
+procedures:
+  system_latency:
+    action: "REFETCH_DB"
+    risk: "low"
+    auto_trigger: true
+  schema_skew:
+    action: "REFETCH_SCHEMA"
+    risk: "low"
+    auto_trigger: true
+  data_drift:
+    action: "TICKET_ONLY"
+    risk: "high"
+    auto_trigger: false
+  performance_drop:
+    action: "TICKET_ONLY"
+    risk: "high"
+    auto_trigger: false
