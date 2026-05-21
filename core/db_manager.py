@@ -1,242 +1,215 @@
-"""Database migration manager for VigilantMLOps.
+"""
+Database migration manager for VigilantMLOps (PostgreSQL + ClickHouse).
 
-Usage (from apps/backend/):
-    python -m core.db_manager           # apply pending migrations
+Usage (from project root):
+    python -m core.db_manager           # apply all pending migrations
     python -m core.db_manager init      # same as above
-    python -m core.db_manager reset     # drop all tables and re-init
-    python -m core.db_manager status    # show applied migration history
-    python -m core.db_manager --db /path/to/other.db init
+    python -m core.db_manager reset     # drop all tables and re-apply schemas
+    python -m core.db_manager status    # show migration history
+
+Connection is configured via environment variables:
+    POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+    CLICKHOUSE_HOST, CLICKHOUSE_PORT, CLICKHOUSE_DB, CLICKHOUSE_USER, CLICKHOUSE_PASSWORD
 """
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import duckdb
+import psycopg2
+import psycopg2.extras
+from clickhouse_driver import Client as ClickHouseClient
 
-# ── Path resolution ───────────────────────────────────────────────────────────
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_DB = Path(os.path.join(BASE_DIR, "database", "vigilant.db"))
-
-
-def _resolve_db_path() -> Path:
-    raw = os.getenv("VIGILANT_DB_PATH")
-    if raw:
-        p = Path(raw)
-        return p if p.is_absolute() else Path.cwd() / p
-    return _DEFAULT_DB
+_BASE     = Path(__file__).resolve().parent
+_PG_SCHEMA = _BASE / "database" / "postgres"   / "schema.sql"
+_CH_SCHEMA = _BASE / "database" / "clickhouse" / "schema.sql"
 
 
 # ── Migration registry ────────────────────────────────────────────────────────
+# To add a new migration, append a Migration with the next version number and
+# list the SQL files or inline ALTER statements to run on each backend.
+# The version is recorded in PostgreSQL's schema_migrations only after all
+# statements on both databases succeed.
 
 @dataclass(frozen=True)
 class Migration:
     version: int
     description: str
-    statements: tuple[str, ...]
 
 
-# To add a new migration, append a new Migration entry with the next version
-# number.  Statements are executed in order and the version is recorded in
-# schema_version only after all statements succeed.
-#
-# Column additions example:
-#   Migration(
-#       version=2,
-#       description="Add source_ip column to alerts",
-#       statements=(
-#           "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS source_ip VARCHAR",
-#       ),
-#   ),
 MIGRATIONS: list[Migration] = [
     Migration(
         version=1,
-        description="Initial schema: reports, incidents, production_log, alerts",
-        statements=(
-            """
-            CREATE TABLE IF NOT EXISTS reports (
-                report_id     VARCHAR PRIMARY KEY,
-                timestamp     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                report_type   VARCHAR NOT NULL,
-                model_version VARCHAR,
-                metrics       JSON,
-                artifacts     JSON
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS incidents (
-                incident_id   VARCHAR PRIMARY KEY,
-                timestamp     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                severity      VARCHAR NOT NULL,
-                incident_type VARCHAR NOT NULL,
-                description   TEXT,
-                status        VARCHAR NOT NULL DEFAULT 'TRIGGERED'
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS production_log (
-                log_id      VARCHAR PRIMARY KEY,
-                received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                features    JSON NOT NULL
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS alerts (
-                alert_id  VARCHAR PRIMARY KEY,
-                timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                level     VARCHAR NOT NULL,
-                message   TEXT NOT NULL,
-                metadata  JSON
-            )
-            """,
-        ),
-    ),
-    Migration(
-        version=2,
-        description="Add feature_stats table for drift baseline statistics",
-        statements=(
-            """
-            CREATE TABLE IF NOT EXISTS feature_stats (
-                feature_name VARCHAR PRIMARY KEY,
-                stats_json   JSON NOT NULL,
-                updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """,
+        description=(
+            "Initial dual-DB schema: PostgreSQL (models, feature_stats, reports, incidents)"
+            " + ClickHouse (production_log, alerts, drift_results, report_metrics, llm_traces)"
         ),
     ),
 ]
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
 
-_SCHEMA_VERSION_DDL = """
-CREATE TABLE IF NOT EXISTS schema_version (
-    version     INTEGER PRIMARY KEY,
-    description VARCHAR NOT NULL,
-    applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+# ── Connection helpers ────────────────────────────────────────────────────────
+
+def _pg_connect() -> psycopg2.extensions.connection:
+    conn = psycopg2.connect(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        dbname=os.getenv("POSTGRES_DB", "vigilant"),
+        user=os.getenv("POSTGRES_USER", "vigilant"),
+        password=os.getenv("POSTGRES_PASSWORD", "vigilant"),
+    )
+    conn.autocommit = True
+    return conn
+
+
+def _ch_connect() -> ClickHouseClient:
+    return ClickHouseClient(
+        host=os.getenv("CLICKHOUSE_HOST", "localhost"),
+        port=int(os.getenv("CLICKHOUSE_PORT", "9000")),
+        database=os.getenv("CLICKHOUSE_DB", "vigilant"),
+        user=os.getenv("CLICKHOUSE_USER", "default"),
+        password=os.getenv("CLICKHOUSE_PASSWORD", ""),
+    )
+
+
+def _split_statements(sql: str) -> list[str]:
+    """Split a SQL file into individual statements, stripping comment lines."""
+    sql = re.sub(r'--[^\n]*', '', sql)
+    return [s.strip() for s in sql.split(';') if s.strip()]
+
+
+# ── Version tracking (stored in PostgreSQL schema_migrations) ─────────────────
+
+_VERSION_DDL = """
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     INTEGER         PRIMARY KEY,
+    description VARCHAR(500)    NOT NULL,
+    applied_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 )
 """
 
 
-SEED_PATH = os.path.join(BASE_DIR, "database", "seed_data.sql")
-_SEED_SQL = Path(SEED_PATH)
+def _current_version(pg: psycopg2.extensions.connection) -> int:
+    with pg.cursor() as cur:
+        cur.execute(_VERSION_DDL)
+        cur.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
+        return cur.fetchone()[0]
 
 
-def _connect(db_path: Path) -> duckdb.DuckDBPyConnection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(db_path))
+def _record(pg: psycopg2.extensions.connection, m: Migration) -> None:
+    with pg.cursor() as cur:
+        cur.execute(
+            "INSERT INTO schema_migrations (version, description) VALUES (%s, %s)"
+            " ON CONFLICT DO NOTHING",
+            [m.version, m.description],
+        )
+
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+
+def init() -> None:
+    """Apply all pending migrations to both PostgreSQL and ClickHouse."""
+    pg = _pg_connect()
+    ch = _ch_connect()
     try:
-        conn.execute("LOAD json")
-    except Exception:
-        pass  # built-in since DuckDB 1.0; safe to ignore
-    return conn
-
-
-def _current_version(conn: duckdb.DuckDBPyConnection) -> int:
-    conn.execute(_SCHEMA_VERSION_DDL)
-    row = conn.execute(
-        "SELECT COALESCE(MAX(version), 0) FROM schema_version"
-    ).fetchone()
-    return row[0] if row else 0
-
-
-def _apply_seed(conn: duckdb.DuckDBPyConnection) -> None:
-    """Load seed_data.sql when either feature_stats or reports is empty.
-
-    All statements use INSERT OR REPLACE so re-running is safe.
-    """
-    if not _SEED_SQL.exists():
-        return
-
-    n_stats = conn.execute("SELECT COUNT(*) FROM feature_stats").fetchone()[0]
-    n_reports = conn.execute("SELECT COUNT(*) FROM reports").fetchone()[0]
-    if n_stats > 0 and n_reports > 0:
-        print(f"  feature_stats ({n_stats}) and reports ({n_reports}) already populated — skipping seed.")
-        return
-
-    inserted = 0
-    for line in _SEED_SQL.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("--"):
-            conn.execute(line)
-            inserted += 1
-
-    print(f"  Seeded {inserted} statements from {_SEED_SQL.name}.")
-
-
-# ── Public API ────────────────────────────────────────────────────────────────
-
-def init(db_path: Path) -> None:
-    """Apply all pending migrations in ascending version order, then seed if fresh."""
-    conn = _connect(db_path)
-    try:
-        current = _current_version(conn)
+        current = _current_version(pg)
         pending = [m for m in MIGRATIONS if m.version > current]
 
         if not pending:
-            print(f"Database is up to date (version {current}).")
-        else:
-            for migration in pending:
-                print(f"Applying v{migration.version}: {migration.description}")
-                for stmt in migration.statements:
-                    conn.execute(stmt)
-                conn.execute(
-                    "INSERT INTO schema_version (version, description) VALUES (?, ?)",
-                    [migration.version, migration.description],
-                )
-                print(f"  v{migration.version} applied.")
+            print(f"Both databases are up to date (schema version {current}).")
+            return
 
-            final = _current_version(conn)
-            print(f"Database ready at version {final}.")
+        for m in pending:
+            print(f"Applying v{m.version}: {m.description}")
 
-        _apply_seed(conn)
+            print("  → PostgreSQL ...")
+            with pg.cursor() as cur:
+                cur.execute(_PG_SCHEMA.read_text())
+            print("  ✓ PostgreSQL done.")
+
+            print("  → ClickHouse ...")
+            for stmt in _split_statements(_CH_SCHEMA.read_text()):
+                ch.execute(stmt)
+            print("  ✓ ClickHouse done.")
+
+            _record(pg, m)
+            print(f"  v{m.version} recorded in schema_migrations.")
+
+        print(f"\nBoth databases ready at schema version {_current_version(pg)}.")
     finally:
-        conn.close()
+        pg.close()
+        ch.disconnect()
 
 
-def reset(db_path: Path) -> None:
-    """Drop every table (including schema_version) then re-apply all migrations."""
-    conn = _connect(db_path)
+def reset() -> None:
+    """Drop all tables in both databases, then re-apply all schemas from scratch."""
+    pg = _pg_connect()
+    ch = _ch_connect()
     try:
-        rows = conn.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
-        ).fetchall()
-        for (table,) in rows:
-            conn.execute(f'DROP TABLE IF EXISTS "{table}" CASCADE')
-            print(f"Dropped: {table}")
+        # PostgreSQL: drop all user tables in the public schema
+        with pg.cursor() as cur:
+            cur.execute(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+            )
+            tables = [r[0] for r in cur.fetchall()]
+        for table in tables:
+            with pg.cursor() as cur:
+                cur.execute(f'DROP TABLE IF EXISTS "{table}" CASCADE')
+            print(f"  Dropped PG table: {table}")
+
+        # PostgreSQL: drop enum types created by this schema
+        with pg.cursor() as cur:
+            cur.execute("""
+                SELECT typname FROM pg_type
+                WHERE typtype = 'e'
+                  AND typnamespace = (
+                      SELECT oid FROM pg_namespace WHERE nspname = 'public'
+                  )
+            """)
+            enums = [r[0] for r in cur.fetchall()]
+        for enum in enums:
+            with pg.cursor() as cur:
+                cur.execute(f'DROP TYPE IF EXISTS "{enum}" CASCADE')
+            print(f"  Dropped PG enum: {enum}")
+
+        # ClickHouse: drop all tables in the current database
+        for (table,) in ch.execute("SHOW TABLES"):
+            ch.execute(f"DROP TABLE IF EXISTS {table}")
+            print(f"  Dropped CH table: {table}")
+
     finally:
-        conn.close()
+        pg.close()
+        ch.disconnect()
 
-    init(db_path)
+    init()
 
 
-def status(db_path: Path) -> None:
-    """Print applied migration history and list any pending versions."""
-    if not db_path.exists():
-        print(f"Database does not exist yet: {db_path}")
-        return
-
-    conn = _connect(db_path)
+def status() -> None:
+    """Print the migration history recorded in PostgreSQL."""
+    pg = _pg_connect()
     try:
-        current = _current_version(conn)
-        rows = conn.execute(
-            "SELECT version, description, applied_at"
-            " FROM schema_version ORDER BY version"
-        ).fetchall()
+        current = _current_version(pg)
+        with pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT version, description, applied_at"
+                " FROM schema_migrations ORDER BY version"
+            )
+            rows = cur.fetchall()
     finally:
-        conn.close()
+        pg.close()
 
     if not rows:
         print("No migrations applied yet.")
     else:
-        header = f"{'Ver':>4}  {'Applied At':<28}  Description"
+        header = f"{'Ver':>4}  {'Applied At':<32}  Description"
         print(header)
         print("-" * len(header))
-        for version, description, applied_at in rows:
-            print(f"{version:>4}  {str(applied_at):<28}  {description}")
+        for row in rows:
+            print(f"{row['version']:>4}  {str(row['applied_at']):<32}  {row['description']}")
 
     pending = [m for m in MIGRATIONS if m.version > current]
     if pending:
@@ -250,7 +223,7 @@ def status(db_path: Path) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="python -m core.db_manager",
-        description="VigilantMLOps database migration manager",
+        description="VigilantMLOps database migration manager (PostgreSQL + ClickHouse)",
     )
     parser.add_argument(
         "command",
@@ -259,22 +232,14 @@ def main(argv: list[str] | None = None) -> None:
         choices=["init", "reset", "status"],
         help="init (default) | reset | status",
     )
-    parser.add_argument(
-        "--db",
-        metavar="PATH",
-        help="Override DB path (default: VIGILANT_DB_PATH env or core/database/vigilant.db)",
-    )
     args = parser.parse_args(argv)
 
-    db_path = Path(args.db) if args.db else _resolve_db_path()
-    print(f"DB: {db_path}")
-
     if args.command == "init":
-        init(db_path)
+        init()
     elif args.command == "reset":
-        reset(db_path)
+        reset()
     elif args.command == "status":
-        status(db_path)
+        status()
 
 
 if __name__ == "__main__":

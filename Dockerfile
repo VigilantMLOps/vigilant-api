@@ -10,7 +10,7 @@ ENV POETRY_NO_INTERACTION=1
 
 WORKDIR /app
 
-# Install system dependencies (needed for DuckDB/Health checks)
+# Install system dependencies (curl for health checks, build-essential for C extensions)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \

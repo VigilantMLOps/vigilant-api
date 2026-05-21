@@ -1,0 +1,423 @@
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.900000 | pvalue=0.500000 | status=critical
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:41:26 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.150000 | pvalue=0.500000 | status=warning
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=4bf3445e-b913-40c8-ab69-29bf4844e97b | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Feature 'state' drift detected (PSI=0.9000) | metadata={'incident_id': '4bf3445e-b913-40c8-ab69-29bf4844e97b', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 0.9}
+============================================================
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=27fabc13-082d-48e0-96ca-09c79454a3cd | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Feature 'state' drift detected (PSI=0.9000) | metadata={'incident_id': '27fabc13-082d-48e0-96ca-09c79454a3cd', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 0.9}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=avg | psi=7.206086 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'avg': PSI=7.2061 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=3b8e3f4b-15b9-41b3-9e91-7247675cd21b | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'avg': PSI=7.2061 (CRITICAL threshold exceeded) | metadata={'incident_id': '3b8e3f4b-15b9-41b3-9e91-7247675cd21b', 'event_type': 'DRIFT', 'feature': 'avg', 'psi': 7.206086}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=max | psi=17.601343 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'max': PSI=17.6013 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=76d00dc1-269a-4412-b481-e7fd110c2a28 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'max': PSI=17.6013 (CRITICAL threshold exceeded) | metadata={'incident_id': '76d00dc1-269a-4412-b481-e7fd110c2a28', 'event_type': 'DRIFT', 'feature': 'max', 'psi': 17.601343}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=bytes_total | psi=15.395712 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'bytes_total': PSI=15.3957 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=7bca450f-611f-4019-88ab-cc29ca27e3f2 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'bytes_total': PSI=15.3957 (CRITICAL threshold exceeded) | metadata={'incident_id': '7bca450f-611f-4019-88ab-cc29ca27e3f2', 'event_type': 'DRIFT', 'feature': 'bytes_total', 'psi': 15.395712}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=pkts_total | psi=15.395712 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'pkts_total': PSI=15.3957 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=99d587d4-4856-4e85-9f17-7b5745551cd9 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'pkts_total': PSI=15.3957 (CRITICAL threshold exceeded) | metadata={'incident_id': '99d587d4-4856-4e85-9f17-7b5745551cd9', 'event_type': 'DRIFT', 'feature': 'pkts_total', 'psi': 15.395712}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=rate | psi=18.242166 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'rate': PSI=18.2422 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=acd6a51d-15df-4de8-846f-bda760f0f891 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'rate': PSI=18.2422 (CRITICAL threshold exceeded) | metadata={'incident_id': 'acd6a51d-15df-4de8-846f-bda760f0f891', 'event_type': 'DRIFT', 'feature': 'rate', 'psi': 18.242166}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=srate | psi=18.242166 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'srate': PSI=18.2422 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=ec4c54a4-e61a-496f-b3a2-3dc19a9d3692 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'srate': PSI=18.2422 (CRITICAL threshold exceeded) | metadata={'incident_id': 'ec4c54a4-e61a-496f-b3a2-3dc19a9d3692', 'event_type': 'DRIFT', 'feature': 'srate', 'psi': 18.242166}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=min | psi=7.206086 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'min': PSI=7.2061 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=ca4bc268-bff3-4be6-b590-ffb703abd099 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'min': PSI=7.2061 (CRITICAL threshold exceeded) | metadata={'incident_id': 'ca4bc268-bff3-4be6-b590-ffb703abd099', 'event_type': 'DRIFT', 'feature': 'min', 'psi': 7.206086}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=flow_duration | psi=11.295687 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'flow_duration': PSI=11.2957 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=44d7a016-54d9-47fd-9dde-f62ace2c8b68 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'flow_duration': PSI=11.2957 (CRITICAL threshold exceeded) | metadata={'incident_id': '44d7a016-54d9-47fd-9dde-f62ace2c8b68', 'event_type': 'DRIFT', 'feature': 'flow_duration', 'psi': 11.295687}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=std | psi=18.079379 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'std': PSI=18.0794 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=ecd6478c-e78b-447b-9304-cc8e8e9c10b1 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'std': PSI=18.0794 (CRITICAL threshold exceeded) | metadata={'incident_id': 'ecd6478c-e78b-447b-9304-cc8e8e9c10b1', 'event_type': 'DRIFT', 'feature': 'std', 'psi': 18.079379}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=drate | psi=36.841361 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'drate': PSI=36.8414 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=e6d1671e-2c05-4300-bf92-26c727b7f880 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'drate': PSI=36.8414 (CRITICAL threshold exceeded) | metadata={'incident_id': 'e6d1671e-2c05-4300-bf92-26c727b7f880', 'event_type': 'DRIFT', 'feature': 'drate', 'psi': 36.841361}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=source | psi=9.210340 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'source': PSI=9.2103 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=5172d0b0-3357-4adf-b36b-ac415decb1b5 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'source': PSI=9.2103 (CRITICAL threshold exceeded) | metadata={'incident_id': '5172d0b0-3357-4adf-b36b-ac415decb1b5', 'event_type': 'DRIFT', 'feature': 'source', 'psi': 9.21034}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=state | psi=36.230497 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'state': PSI=36.2305 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=dfe45267-c079-408a-bd41-8d10d019a525 | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'state': PSI=36.2305 (CRITICAL threshold exceeded) | metadata={'incident_id': 'dfe45267-c079-408a-bd41-8d10d019a525', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 36.230497}
+============================================================
+2026-05-21 12:41:26 | INFO     | vigilant.drift | Drift | feature=proto | psi=35.059313 | status=CRITICAL
+2026-05-21 12:41:26 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'proto': PSI=35.0593 (CRITICAL threshold exceeded)
+2026-05-21 12:41:26 | DEBUG    | vigilant.alerting | Incident persisted | id=cee15281-6304-48eb-bd1c-3efeef59b83a | type=DRIFT
+2026-05-21 12:41:26 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'proto': PSI=35.0593 (CRITICAL threshold exceeded) | metadata={'incident_id': 'cee15281-6304-48eb-bd1c-3efeef59b83a', 'event_type': 'DRIFT', 'feature': 'proto', 'psi': 35.059313}
+============================================================
+2026-05-21 12:41:26 | DEBUG    | vigilant.middleware | Request POST /api/v1/reporter/evaluate-drift completed in 7.6ms — status 200
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.900000 | pvalue=0.500000 | status=critical
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:43:28 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.150000 | pvalue=0.500000 | status=warning
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=3b3b97a0-b191-4d3a-a106-d9d953347770 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Feature 'state' drift detected (PSI=0.9000) | metadata={'incident_id': '3b3b97a0-b191-4d3a-a106-d9d953347770', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 0.9}
+============================================================
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=d5e84969-1d36-4b46-9119-258abe60d642 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Feature 'state' drift detected (PSI=0.9000) | metadata={'incident_id': 'd5e84969-1d36-4b46-9119-258abe60d642', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 0.9}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift check | n_baseline_features=13 | n_production_rows=60
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=bytes_total | psi=15.395712 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'bytes_total': PSI=15.3957 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=06f67717-eb9e-42f3-b281-f8b30da4238b | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'bytes_total': PSI=15.3957 (CRITICAL threshold exceeded) | metadata={'incident_id': '06f67717-eb9e-42f3-b281-f8b30da4238b', 'event_type': 'DRIFT', 'feature': 'bytes_total', 'psi': 15.395712}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=pkts_total | psi=15.395712 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'pkts_total': PSI=15.3957 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=fde9ce1a-925a-4bd2-86dc-027bd316269d | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'pkts_total': PSI=15.3957 (CRITICAL threshold exceeded) | metadata={'incident_id': 'fde9ce1a-925a-4bd2-86dc-027bd316269d', 'event_type': 'DRIFT', 'feature': 'pkts_total', 'psi': 15.395712}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=avg | psi=7.206086 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'avg': PSI=7.2061 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=1aeacebe-0a46-484a-abde-b6bc7353c21e | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'avg': PSI=7.2061 (CRITICAL threshold exceeded) | metadata={'incident_id': '1aeacebe-0a46-484a-abde-b6bc7353c21e', 'event_type': 'DRIFT', 'feature': 'avg', 'psi': 7.206086}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=flow_duration | psi=11.295687 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'flow_duration': PSI=11.2957 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=1b07f606-fc6e-48a9-9fa8-f163b810df15 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'flow_duration': PSI=11.2957 (CRITICAL threshold exceeded) | metadata={'incident_id': '1b07f606-fc6e-48a9-9fa8-f163b810df15', 'event_type': 'DRIFT', 'feature': 'flow_duration', 'psi': 11.295687}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=drate | psi=36.841361 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'drate': PSI=36.8414 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=abceceaf-696f-4b2f-80bf-2566d85728c3 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'drate': PSI=36.8414 (CRITICAL threshold exceeded) | metadata={'incident_id': 'abceceaf-696f-4b2f-80bf-2566d85728c3', 'event_type': 'DRIFT', 'feature': 'drate', 'psi': 36.841361}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=max | psi=17.601343 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'max': PSI=17.6013 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=85590b81-b933-4279-8716-1ab55ac8f2bd | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'max': PSI=17.6013 (CRITICAL threshold exceeded) | metadata={'incident_id': '85590b81-b933-4279-8716-1ab55ac8f2bd', 'event_type': 'DRIFT', 'feature': 'max', 'psi': 17.601343}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=rate | psi=18.242166 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'rate': PSI=18.2422 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=aa9831d3-a24f-4a62-b4a1-9346e2c1a3bc | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'rate': PSI=18.2422 (CRITICAL threshold exceeded) | metadata={'incident_id': 'aa9831d3-a24f-4a62-b4a1-9346e2c1a3bc', 'event_type': 'DRIFT', 'feature': 'rate', 'psi': 18.242166}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=std | psi=18.079379 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'std': PSI=18.0794 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=bb6ce3b0-d650-48e0-a617-c3717eae1855 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'std': PSI=18.0794 (CRITICAL threshold exceeded) | metadata={'incident_id': 'bb6ce3b0-d650-48e0-a617-c3717eae1855', 'event_type': 'DRIFT', 'feature': 'std', 'psi': 18.079379}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=min | psi=7.206086 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'min': PSI=7.2061 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=6a92d44f-973d-47ef-8f7a-3e6e55e560c0 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'min': PSI=7.2061 (CRITICAL threshold exceeded) | metadata={'incident_id': '6a92d44f-973d-47ef-8f7a-3e6e55e560c0', 'event_type': 'DRIFT', 'feature': 'min', 'psi': 7.206086}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=srate | psi=18.242166 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'srate': PSI=18.2422 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=c6018d29-a0cc-4e22-90f3-f9cde330e7e7 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'srate': PSI=18.2422 (CRITICAL threshold exceeded) | metadata={'incident_id': 'c6018d29-a0cc-4e22-90f3-f9cde330e7e7', 'event_type': 'DRIFT', 'feature': 'srate', 'psi': 18.242166}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=state | psi=36.230497 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'state': PSI=36.2305 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=24add691-6565-41e0-9de3-b27752f689b2 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'state': PSI=36.2305 (CRITICAL threshold exceeded) | metadata={'incident_id': '24add691-6565-41e0-9de3-b27752f689b2', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 36.230497}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=proto | psi=35.059313 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'proto': PSI=35.0593 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=5f1d0ec9-0596-4dcb-ac55-e92cbfbde51d | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'proto': PSI=35.0593 (CRITICAL threshold exceeded) | metadata={'incident_id': '5f1d0ec9-0596-4dcb-ac55-e92cbfbde51d', 'event_type': 'DRIFT', 'feature': 'proto', 'psi': 35.059313}
+============================================================
+2026-05-21 12:43:28 | INFO     | vigilant.drift | Drift | feature=source | psi=9.210340 | status=CRITICAL
+2026-05-21 12:43:28 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'source': PSI=9.2103 (CRITICAL threshold exceeded)
+2026-05-21 12:43:28 | DEBUG    | vigilant.alerting | Incident persisted | id=ad74c152-18bb-4dbe-9368-7a6928c80275 | type=DRIFT
+2026-05-21 12:43:28 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'source': PSI=9.2103 (CRITICAL threshold exceeded) | metadata={'incident_id': 'ad74c152-18bb-4dbe-9368-7a6928c80275', 'event_type': 'DRIFT', 'feature': 'source', 'psi': 9.21034}
+============================================================
+2026-05-21 12:43:28 | DEBUG    | vigilant.middleware | Request POST /api/v1/reporter/evaluate-drift completed in 7.2ms — status 200
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.900000 | pvalue=0.500000 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.150000 | pvalue=0.500000 | status=warning
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=eddda213-a6c5-4895-b3da-fdaf10534732 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Feature 'state' drift detected (PSI=0.9000) | metadata={'incident_id': 'eddda213-a6c5-4895-b3da-fdaf10534732', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 0.9}
+============================================================
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=846a20f4-528f-4179-9c18-81f572f29395 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Feature 'state' drift detected (PSI=0.9000) | metadata={'incident_id': '846a20f4-528f-4179-9c18-81f572f29395', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 0.9}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift check | n_baseline_features=13 | n_production_rows=60
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=min | psi=7.206086 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'min': PSI=7.2061 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=d013b1c2-4e17-4c97-b6b4-28161bf7b831 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'min': PSI=7.2061 (CRITICAL threshold exceeded) | metadata={'incident_id': 'd013b1c2-4e17-4c97-b6b4-28161bf7b831', 'event_type': 'DRIFT', 'feature': 'min', 'psi': 7.206086}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=avg | psi=7.206086 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'avg': PSI=7.2061 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=77f9a31b-9785-4ce8-aec2-ffc4587b1e32 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'avg': PSI=7.2061 (CRITICAL threshold exceeded) | metadata={'incident_id': '77f9a31b-9785-4ce8-aec2-ffc4587b1e32', 'event_type': 'DRIFT', 'feature': 'avg', 'psi': 7.206086}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=drate | psi=36.841361 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'drate': PSI=36.8414 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=98c89ecc-1ad5-4451-a0fc-26ca39f5dabf | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'drate': PSI=36.8414 (CRITICAL threshold exceeded) | metadata={'incident_id': '98c89ecc-1ad5-4451-a0fc-26ca39f5dabf', 'event_type': 'DRIFT', 'feature': 'drate', 'psi': 36.841361}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=rate | psi=18.242166 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'rate': PSI=18.2422 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=1c805d49-10e9-4cbb-87ef-88b564a95c20 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'rate': PSI=18.2422 (CRITICAL threshold exceeded) | metadata={'incident_id': '1c805d49-10e9-4cbb-87ef-88b564a95c20', 'event_type': 'DRIFT', 'feature': 'rate', 'psi': 18.242166}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=max | psi=17.601343 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'max': PSI=17.6013 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=649b080e-3795-4a3a-9fa0-e2a359233d1e | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'max': PSI=17.6013 (CRITICAL threshold exceeded) | metadata={'incident_id': '649b080e-3795-4a3a-9fa0-e2a359233d1e', 'event_type': 'DRIFT', 'feature': 'max', 'psi': 17.601343}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=std | psi=18.079379 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'std': PSI=18.0794 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=06c37bb1-c58a-4b66-b00c-548c4f5e8596 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'std': PSI=18.0794 (CRITICAL threshold exceeded) | metadata={'incident_id': '06c37bb1-c58a-4b66-b00c-548c4f5e8596', 'event_type': 'DRIFT', 'feature': 'std', 'psi': 18.079379}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=bytes_total | psi=15.395712 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'bytes_total': PSI=15.3957 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=ab7bcc2a-dce8-4729-870f-9edfd7c858e2 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'bytes_total': PSI=15.3957 (CRITICAL threshold exceeded) | metadata={'incident_id': 'ab7bcc2a-dce8-4729-870f-9edfd7c858e2', 'event_type': 'DRIFT', 'feature': 'bytes_total', 'psi': 15.395712}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=srate | psi=18.242166 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'srate': PSI=18.2422 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=ee0afb75-494f-41f0-a09d-19b7bce09a15 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'srate': PSI=18.2422 (CRITICAL threshold exceeded) | metadata={'incident_id': 'ee0afb75-494f-41f0-a09d-19b7bce09a15', 'event_type': 'DRIFT', 'feature': 'srate', 'psi': 18.242166}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=pkts_total | psi=15.395712 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'pkts_total': PSI=15.3957 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=9fedc186-92eb-4020-910b-abdb69b4160d | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'pkts_total': PSI=15.3957 (CRITICAL threshold exceeded) | metadata={'incident_id': '9fedc186-92eb-4020-910b-abdb69b4160d', 'event_type': 'DRIFT', 'feature': 'pkts_total', 'psi': 15.395712}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=flow_duration | psi=11.295687 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'flow_duration': PSI=11.2957 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=71870813-b74e-453b-9292-a040bda09c8d | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'flow_duration': PSI=11.2957 (CRITICAL threshold exceeded) | metadata={'incident_id': '71870813-b74e-453b-9292-a040bda09c8d', 'event_type': 'DRIFT', 'feature': 'flow_duration', 'psi': 11.295687}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=source | psi=9.210340 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'source': PSI=9.2103 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=9b8739cc-4939-46ac-a551-a14d83ac76a1 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'source': PSI=9.2103 (CRITICAL threshold exceeded) | metadata={'incident_id': '9b8739cc-4939-46ac-a551-a14d83ac76a1', 'event_type': 'DRIFT', 'feature': 'source', 'psi': 9.21034}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=state | psi=36.230497 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'state': PSI=36.2305 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=c4a270da-2556-4005-9d5c-62d53e2b4f26 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'state': PSI=36.2305 (CRITICAL threshold exceeded) | metadata={'incident_id': 'c4a270da-2556-4005-9d5c-62d53e2b4f26', 'event_type': 'DRIFT', 'feature': 'state', 'psi': 36.230497}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.drift | Drift | feature=proto | psi=35.059313 | status=CRITICAL
+2026-05-21 12:46:58 | WARNING  | vigilant.drift | DRIFT:CRITICAL | Data drift detected in 'proto': PSI=35.0593 (CRITICAL threshold exceeded)
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=0272b15c-5f2e-4a1d-a253-2867a01e2e29 | type=DRIFT
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Data drift detected in 'proto': PSI=35.0593 (CRITICAL threshold exceeded) | metadata={'incident_id': '0272b15c-5f2e-4a1d-a253-2867a01e2e29', 'event_type': 'DRIFT', 'feature': 'proto', 'psi': 35.059313}
+============================================================
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request POST /api/v1/reporter/evaluate-drift completed in 6.3ms — status 200
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /api/v1/reports/latest completed in 1.1ms — status 200
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /api/v1/reports/latest completed in 0.3ms — status 404
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /api/v1/reports/history completed in 0.6ms — status 200
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /health completed in 0.5ms — status 200
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /health completed in 0.3ms — status 200
+2026-05-21 12:46:58 | INFO     | test.infra | Test Log
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /health completed in 600.0ms — status 200
+2026-05-21 12:46:58 | DEBUG    | vigilant.middleware | Request GET /_test_500_infra completed in 0.5ms — status 500
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=526a6bae-076f-43ec-acce-31226ed3f4de | type=SYSTEM
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Server error: GET /_test_500_infra returned HTTP 500 | metadata={'incident_id': '526a6bae-076f-43ec-acce-31226ed3f4de', 'event_type': 'SYSTEM', 'status_code': 500, 'path': '/_test_500_infra'}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.performance | Performance check | acc=0.5 | prec=0.0 | rec=0.0 | f1=0.0
+2026-05-21 12:46:58 | WARNING  | vigilant.performance | ALERT:CRITICAL | Model accuracy dropped to 0.5000 — below critical threshold 0.85
+2026-05-21 12:46:58 | INFO     | vigilant.performance | Performance check | acc=1.0 | prec=1.0 | rec=1.0 | f1=1.0
+2026-05-21 12:46:58 | INFO     | vigilant.performance | Performance check | acc=0.5 | prec=0.0 | rec=0.0 | f1=0.0
+2026-05-21 12:46:58 | WARNING  | vigilant.performance | ALERT:CRITICAL | Model accuracy dropped to 0.5000 — below critical threshold 0.85
+2026-05-21 12:46:58 | DEBUG    | vigilant.alerting | Incident persisted | id=d9cf21f3-c1ee-4d6c-924a-069ed6344ef5 | type=PERFORMANCE
+2026-05-21 12:46:58 | ERROR    | vigilant.notifications | 
+============================================================
+[ALERT:CRITICAL] Model accuracy dropped to 0.5000 — below critical threshold 0.85 | metadata={'incident_id': 'd9cf21f3-c1ee-4d6c-924a-069ed6344ef5', 'event_type': 'PERFORMANCE', 'accuracy': 0.5, 'threshold': 0.85}
+============================================================
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=min | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=max | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=proto | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=state | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=source | psi=0.000000 | pvalue=1.000000 | status=ok
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=flow_duration | psi=10.361633 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=bytes_total | psi=10.361633 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=pkts_total | psi=0.000000 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=rate | psi=0.000000 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=srate | psi=0.000000 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=drate | psi=0.000000 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=min | psi=8.127120 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=max | psi=8.127120 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=avg | psi=8.127120 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=std | psi=0.000000 | pvalue=0.000011 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=proto | psi=39.664484 | pvalue=0.001250 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=state | psi=40.835667 | pvalue=0.000045 | status=critical
+2026-05-21 12:46:58 | INFO     | vigilant.reporter | Drift check | feature=source | psi=10.361633 | pvalue=0.038867 | status=critical

@@ -8,18 +8,16 @@ from unittest.mock import MagicMock, patch
 import polars as pl
 import pytest
 
-from core.database import Database
 from services.alerting_engine import AlertManager
 from services.data_loader import DataPaths, RawDataPaths
 from services.reporter import ModelAPIConfig, ReporterConfig, ReporterService
+from tests.fake_database import FakeDatabase
 
 _DUMMY = Path("/tmp")
 
 # ---------------------------------------------------------------------------
 # Test data
 # ---------------------------------------------------------------------------
-# Minimal records: only numeric features + 'state' (our target categorical).
-# Excluding 'proto'/'source' avoids them being treated as numeric columns.
 _REFERENCE_RECORDS = [
     {"flow_duration": 0.02,  "bytes_total": 50,    "pkts_total": 9.5,   "rate": 0.0,     "srate": 0.0,     "drate": 0.0, "min": 0.0,  "max": 0.0,   "avg": 0.0,  "std": 0.0, "state": "ACC"},
     {"flow_duration": 0.05,  "bytes_total": 54,    "pkts_total": 9.5,   "rate": 0.0,     "srate": 0.0,     "drate": 0.0, "min": 0.0,  "max": 0.0,   "avg": 0.0,  "std": 0.0, "state": "na"},
@@ -33,13 +31,10 @@ _REFERENCE_RECORDS = [
     {"flow_duration": 65.0,  "bytes_total": 40500, "pkts_total": 120.0, "rate": 5000.0,  "srate": 5000.0,  "drate": 0.0, "min": 54.0, "max": 200.0, "avg": 59.0, "std": 5.0, "state": "na"},
 ]
 
-# 60 records (>= _MIN_PSI_SAMPLES=50) with identical distribution so numeric PSI ≈ 0
-# and PSI-reliability guard does not suppress CRITICAL alerts from the categorical patch.
-_PRODUCTION_RECORDS = _REFERENCE_RECORDS * 6
+_PRODUCTION_RECORDS = _REFERENCE_RECORDS * 6  # 60 rows ≥ _MIN_PSI_SAMPLES=50
 
 
 def _make_config() -> ReporterConfig:
-    """Config with only 'state' as categorical column so drift focus is isolated."""
     return ReporterConfig(
         data=DataPaths(
             raw=RawDataPaths(unsw_nb15_dir=_DUMMY, ciciot2023_dir=_DUMMY),
@@ -57,9 +52,9 @@ def _make_config() -> ReporterConfig:
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def tmp_db() -> Database:
-    """Fresh in-memory DuckDB with schema applied, isolated per test."""
-    db = Database(":memory:")
+def tmp_db() -> FakeDatabase:
+    """Fresh in-memory database with schema applied, isolated per test."""
+    db = FakeDatabase()
     db.startup()
     yield db
     db.shutdown()
@@ -79,8 +74,6 @@ def test_critical_threshold_triggers_critical_alert(monkeypatch):
     prod_df = pl.DataFrame(_PRODUCTION_RECORDS)
     monkeypatch.setattr(service._loader, "load_reference", lambda: ref_df)
 
-    # Force 'state' PSI to 0.9 (> psi_critical=0.2) and a non-significant chi2
-    # p-value so the final status comes purely from PSI → CRITICAL.
     with (
         patch("services.reporter._psi_categorical", return_value=0.9),
         patch("services.reporter._chi2_test", return_value=(1.0, 0.5)),
@@ -101,7 +94,6 @@ def test_warning_threshold_triggers_warning_alert(monkeypatch):
     prod_df = pl.DataFrame(_PRODUCTION_RECORDS)
     monkeypatch.setattr(service._loader, "load_reference", lambda: ref_df)
 
-    # PSI=0.15 falls between psi_warning=0.1 and psi_critical=0.2 → WARNING.
     with (
         patch("services.reporter._psi_categorical", return_value=0.15),
         patch("services.reporter._chi2_test", return_value=(1.0, 0.5)),
@@ -118,7 +110,6 @@ def test_warning_threshold_triggers_warning_alert(monkeypatch):
 
 def test_alert_persists_to_alerts_table(tmp_db, monkeypatch):
     """trigger_alert writes one row to alerts with the correct message and UUID."""
-    # Route notification_service._persist to the same in-memory DB.
     monkeypatch.setattr("services.notification_service.db", tmp_db)
 
     manager = AlertManager(db=tmp_db)
@@ -141,7 +132,7 @@ def test_alert_persists_to_alerts_table(tmp_db, monkeypatch):
 
 
 def test_alert_metadata_contains_feature_and_psi(tmp_db, monkeypatch):
-    """The persisted alert metadata JSON carries the feature name 'state' and PSI score."""
+    """The persisted alert metadata JSON carries the feature name and PSI score."""
     monkeypatch.setattr("services.notification_service.db", tmp_db)
 
     manager = AlertManager(db=tmp_db)

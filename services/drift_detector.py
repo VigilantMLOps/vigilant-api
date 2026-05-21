@@ -1,8 +1,9 @@
-"""Drift detection service — PSI-based checks against DuckDB-stored baselines."""
+"""Drift detection service — PSI-based checks against PostgreSQL-stored baselines."""
 from __future__ import annotations
 
 import json
 import math
+import uuid
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -40,7 +41,7 @@ class DriftDetector:
     """
     Computes PSI between incoming production batches and stored reference baselines.
 
-    Reference distributions live in the `feature_stats` DuckDB table.
+    Reference distributions live in the PostgreSQL `feature_stats` table.
     Raises ValueError when the table is empty — run scripts/init_baseline.py first.
 
     PSI thresholds:  < 0.10 → OK  |  0.10–0.25 → WARNING  |  ≥ 0.25 → CRITICAL
@@ -55,11 +56,16 @@ class DriftDetector:
         self._alert_manager = alert_manager
 
     def check_drift(self, current_df: pl.DataFrame) -> DriftCheckResult:
-        """Main entry point — fetches baseline from DuckDB then runs drift calculation.
+        """Main entry point — fetches baseline from PostgreSQL then runs drift calculation.
 
         Raises ValueError if the feature_stats table is empty.
         """
         baseline_stats = self._fetch_baseline_stats()
+        _logger.info(
+            "Drift check | n_baseline_features={} | n_production_rows={}",
+            len(baseline_stats),
+            len(current_df),
+        )
         return self.calculate_drift(current_df, baseline_stats)
 
     def calculate_drift(
@@ -67,7 +73,7 @@ class DriftDetector:
     ) -> DriftCheckResult:
         """Compare current_df against pre-loaded baseline_stats.
 
-        baseline_stats: mapping of feature_name → stats dict as stored in DuckDB.
+        baseline_stats: mapping of feature_name → stats dict as stored in PostgreSQL.
         """
         feature_results: list[FeatureDriftResult] = []
         alerts_fired: list[str] = []
@@ -103,6 +109,14 @@ class DriftDetector:
             _logger.info(
                 "Drift | feature={} | psi={:.6f} | status={}", feature_name, psi, status
             )
+
+            if self._db is not None:
+                self._db.execute(
+                    "INSERT INTO drift_results "
+                    "(drift_id, feature_name, model_id, method, psi_score, status, n_production_rows) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [str(uuid.uuid4()), feature_name, "default", "psi", psi, status, len(current_df)],
+                )
 
             if status != "OK":
                 if _severity_rank(status) > _severity_rank(worst_status):

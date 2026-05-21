@@ -53,7 +53,7 @@ class PerformanceService:
 
     Maintains an internal F1 history so downward trends are detected across
     successive calls. Wire it up with an AlertManager to push incidents to
-    DuckDB and the notification log.
+    PostgreSQL (incidents) and ClickHouse (notification log).
 
     Usage
     -----

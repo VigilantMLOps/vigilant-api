@@ -1,4 +1,4 @@
-"""Alerting engine — incident lifecycle management backed by DuckDB."""
+"""Alerting engine — incident lifecycle management backed by PostgreSQL."""
 from __future__ import annotations
 
 import uuid

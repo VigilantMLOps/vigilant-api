@@ -1,4 +1,4 @@
-"""Notification service — structured alert dispatch with DuckDB persistence."""
+"""Notification service — structured alert dispatch with ClickHouse persistence."""
 from __future__ import annotations
 
 import json
@@ -60,10 +60,9 @@ def _persist(
     level: AlertLevel,
     metadata: dict[str, Any],
 ) -> None:
+    event_type = metadata.get("event_type", "")
     db.execute(
-        """
-        INSERT INTO alerts (alert_id, level, message, metadata)
-        VALUES (?, ?, ?, ?)
-        """,
-        [alert_id, level.value, message, json.dumps(metadata)],
+        "INSERT INTO alerts (alert_id, level, event_type, message, metadata) "
+        "VALUES (?, ?, ?, ?, ?)",
+        [alert_id, level.value, event_type, message, json.dumps(metadata)],
     )

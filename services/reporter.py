@@ -472,11 +472,11 @@ class ReporterService:
         """
         Send the test set to the remote model API and compute classification metrics.
         Stores the result as the production baseline for later decay tracking.
-        Automatically persists the report to DuckDB if the service was given a db instance.
+        Automatically persists the report to PostgreSQL if the service was given a db instance.
 
         df: optional labeled DataFrame (features + target column). When omitted the
             service tries to load the test parquet from disk; if unavailable it falls
-            back to the latest PRE_PROD report stored in DuckDB.
+            back to the latest PRE_PROD report stored in PostgreSQL.
         """
         if df is None:
             try:
@@ -716,9 +716,27 @@ class ReporterService:
             "features": [f.model_dump() for f in result.features],
         })
         self._db.execute(
-            "INSERT INTO reports (report_id, report_type, model_version, metrics, artifacts) "
-            "VALUES (?, ?, ?, ?, ?)",
-            [report_id, "DATA_EVAL", f"{stage}/{result.split}", metrics, artifacts],
+            "INSERT INTO reports "
+            "(report_id, report_type, model_version, metrics, artifacts, "
+            "split, stage, n_rows, n_features, imbalance_ratio, duplicate_rows, missing_cells, class_distribution) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                report_id, "DATA_EVAL", f"{stage}/{result.split}", metrics, artifacts,
+                result.split, stage, result.n_rows, result.n_features,
+                result.imbalance_ratio, result.duplicate_rows, result.missing_cells,
+                json.dumps(result.class_distribution),
+            ],
+        )
+        self._db.execute(
+            "INSERT INTO report_metrics "
+            "(report_id, report_type, model_id, model_version, "
+            "n_rows, n_features, imbalance_ratio, duplicate_rows, missing_cells) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                report_id, "DATA_EVAL", "default", f"{stage}/{result.split}",
+                result.n_rows or 0, result.n_features or 0, result.imbalance_ratio or 0.0,
+                result.duplicate_rows or 0, result.missing_cells or 0,
+            ],
         )
         return report_id
 
@@ -753,9 +771,26 @@ class ReporterService:
             "classification_report": result.report,
         })
         self._db.execute(
-            "INSERT INTO reports (report_id, report_type, model_version, metrics, artifacts) "
-            "VALUES (?, ?, ?, ?, ?)",
-            [report_id, report_type, model_version, metrics, artifacts],
+            "INSERT INTO reports "
+            "(report_id, report_type, model_version, metrics, artifacts, "
+            "accuracy, precision_score, recall, f1_score, roc_auc, avg_precision) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                report_id, report_type, model_version, metrics, artifacts,
+                result.accuracy, result.precision, result.recall,
+                result.f1, result.roc_auc, result.avg_precision,
+            ],
+        )
+        self._db.execute(
+            "INSERT INTO report_metrics "
+            "(report_id, report_type, model_id, model_version, "
+            "accuracy, precision_score, recall, f1_score, roc_auc, avg_precision) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                report_id, report_type, "default", model_version or "",
+                result.accuracy or 0.0, result.precision or 0.0, result.recall or 0.0,
+                result.f1 or 0.0, result.roc_auc or 0.0, result.avg_precision or 0.0,
+            ],
         )
         return report_id
 
@@ -791,15 +826,15 @@ class ReporterService:
         )
 
     def _append_production_records(self, df: pl.DataFrame) -> None:
-        """Persist each row of a production batch to the DuckDB production_log."""
+        """Persist each row of a production batch to the ClickHouse production_log_buffer."""
         for row in df.to_dicts():
             self._db.execute(
-                "INSERT INTO production_log (log_id, features) VALUES (?, ?)",
+                "INSERT INTO production_log_buffer (log_id, features) VALUES (?, ?)",
                 [str(uuid.uuid4()), json.dumps(row)],
             )
 
     def _load_production_records(self) -> pl.DataFrame:
-        """Load all accumulated production records from DuckDB as a Polars DataFrame."""
+        """Load all accumulated production records from ClickHouse as a Polars DataFrame."""
         rows = self._db.fetchall(
             "SELECT features FROM production_log ORDER BY received_at"
         )
@@ -815,7 +850,7 @@ class ReporterService:
         return n
 
     def _load_latest_model_report(self) -> ModelEvaluationResult:
-        """Return the most-recent PRE_PROD report from DuckDB, or raise ValueError."""
+        """Return the most-recent PRE_PROD report from PostgreSQL, or raise ValueError."""
         row = self._db.fetchone(
             "SELECT metrics, artifacts FROM reports "
             "WHERE report_type = 'PRE_PROD' ORDER BY timestamp DESC LIMIT 1"

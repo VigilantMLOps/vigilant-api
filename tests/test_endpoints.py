@@ -2,11 +2,13 @@
 
 Uses httpx.AsyncClient (via the async_client fixture from conftest.py) so
 requests travel through the full FastAPI/Starlette stack with a seeded
-in-memory DuckDB — no external services required.
+in-memory SQLite database — no external services required.
 """
 from __future__ import annotations
 
 import pytest
+
+from tests.fake_database import FakeDatabase
 
 
 async def test_get_latest_report_returns_newest_seed(async_client):
@@ -16,20 +18,17 @@ async def test_get_latest_report_returns_newest_seed(async_client):
     assert response.status_code == 200
     data = response.json()
 
-    # seed-002 has timestamp 11:00 > seed-001 at 10:00
     assert data["report_id"] == "seed-002"
     assert data["report_type"] == "DRIFT"
     assert data["model_version"] == "v1.0-test"
     assert data["timestamp"] is not None
 
-    # metrics was stored as a JSON string; the route deserialises it to a dict
     metrics = data["metrics"]
     assert isinstance(metrics, dict)
     assert metrics["accuracy"] == pytest.approx(0.95)
     assert metrics["f1"] == pytest.approx(0.95)
     assert metrics["roc_auc"] == pytest.approx(0.98)
 
-    # artifacts should also be a dict, not a raw JSON string
     artifacts = data["artifacts"]
     assert isinstance(artifacts, dict)
     assert artifacts["confusion_matrix"] == [[480, 20], [10, 490]]
@@ -39,11 +38,10 @@ async def test_get_latest_report_empty_db(monkeypatch):
     """GET /reports/latest returns 404 when no reports exist."""
     import core.database
     import api.v1.monitoring as monitoring_module
-    from core.database import Database
     from httpx import ASGITransport, AsyncClient
     from main import app
 
-    empty_db = Database(":memory:")
+    empty_db = FakeDatabase()
     empty_db.startup()
 
     monkeypatch.setattr(monitoring_module, "db", empty_db)
@@ -69,10 +67,8 @@ async def test_get_report_history_returns_all_seeds(async_client):
     rows = response.json()
 
     assert len(rows) == 2
-    # Descending order: newest first
     assert rows[0]["report_id"] == "seed-002"
     assert rows[1]["report_id"] == "seed-001"
-    # Both rows must have deserialised metrics
     for row in rows:
         assert isinstance(row["metrics"], dict)
         assert isinstance(row["artifacts"], dict)

@@ -6,9 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.database import Database
 from services.alerting_engine import AlertManager
 from services.performance_service import PerformanceService
+from tests.fake_database import FakeDatabase
 
 
 # ---------------------------------------------------------------------------
@@ -16,9 +16,9 @@ from services.performance_service import PerformanceService
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def tmp_db() -> Database:
-    """Fresh in-memory DuckDB with schema applied, isolated per test."""
-    db = Database(":memory:")
+def tmp_db() -> FakeDatabase:
+    """Fresh in-memory database with schema applied, isolated per test."""
+    db = FakeDatabase()
     db.startup()
     yield db
     db.shutdown()
@@ -28,17 +28,15 @@ def tmp_db() -> Database:
 # Shared test data
 # ---------------------------------------------------------------------------
 
-# 50% accuracy: first 5 labels [0,0,0,0,0] predicted correctly;
-# last 5 labels [1,1,1,1,1] predicted as 0 → 5/10 correct.
-_Y_TRUE_POOR = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
-_Y_PRED_POOR = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+_Y_TRUE_POOR    = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+_Y_PRED_POOR    = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # 50% accuracy
 
 _Y_TRUE_PERFECT = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
 _Y_PRED_PERFECT = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
 
 
 # ---------------------------------------------------------------------------
-# Test 1: Performance drop triggers CRITICAL alert
+# Tests
 # ---------------------------------------------------------------------------
 
 def test_performance_drop_triggers_critical_alert():
@@ -55,12 +53,8 @@ def test_performance_drop_triggers_critical_alert():
     assert mock_alert_manager.trigger_alert.call_args.kwargs["severity"] == "CRITICAL"
 
 
-# ---------------------------------------------------------------------------
-# Test 2: Healthy performance does not trigger any alert
-# ---------------------------------------------------------------------------
-
 def test_healthy_performance_no_critical_alert():
-    """Perfect accuracy must not fire any alert — status is OK (INFO log only)."""
+    """Perfect accuracy must not fire any alert — status is OK."""
     mock_alert_manager = MagicMock(spec=AlertManager)
     svc = PerformanceService(alert_manager=mock_alert_manager)
 
@@ -69,10 +63,6 @@ def test_healthy_performance_no_critical_alert():
     assert result.status == "OK"
     mock_alert_manager.trigger_alert.assert_not_called()
 
-
-# ---------------------------------------------------------------------------
-# Test 3: Alert metadata contains the exact accuracy score
-# ---------------------------------------------------------------------------
 
 def test_alert_metadata_contains_accuracy_score(tmp_db, monkeypatch):
     """The persisted alert row must carry the exact accuracy value (0.5) in metadata."""

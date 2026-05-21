@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.database import Database
 from services.alerting_engine import AlertManager
+from tests.fake_database import FakeDatabase
 
 
 async def test_health_endpoint_returns_200(async_client):
@@ -27,6 +27,18 @@ def test_core_database_directory_exists():
     db_dir = Path(__file__).parent.parent / "core" / "database"
 
     assert db_dir.is_dir(), f"Expected core/database/ directory at {db_dir}"
+
+
+def test_postgres_schema_file_exists():
+    schema = Path(__file__).parent.parent / "core" / "database" / "postgres" / "schema.sql"
+
+    assert schema.is_file(), f"Expected postgres/schema.sql at {schema}"
+
+
+def test_clickhouse_schema_file_exists():
+    schema = Path(__file__).parent.parent / "core" / "database" / "clickhouse" / "schema.sql"
+
+    assert schema.is_file(), f"Expected clickhouse/schema.sql at {schema}"
 
 
 # ---------------------------------------------------------------------------
@@ -63,9 +75,9 @@ def test_logger_write_does_not_raise():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def infra_db() -> Database:
-    """Fresh in-memory DuckDB with schema applied, isolated to system-health tests."""
-    db = Database(":memory:")
+def infra_db() -> FakeDatabase:
+    """Fresh in-memory database with schema applied, isolated to system-health tests."""
+    db = FakeDatabase()
     db.startup()
     yield db
     db.shutdown()
@@ -78,9 +90,6 @@ async def test_slow_request_triggers_latency_warning(async_client, monkeypatch):
     mock_trigger = MagicMock()
     monkeypatch.setattr(main_module._alert_manager, "trigger_alert", mock_trigger)
 
-    # Simulate 600 ms elapsed regardless of how many times perf_counter is
-    # called by framework internals.  Every call returns the same sentinel
-    # object; its __sub__ always yields 0.6 s so (end - start) * 1000 = 600 ms.
     class _FakePerf:
         def __sub__(self, other):
             return 0.6
