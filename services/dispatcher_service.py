@@ -8,6 +8,7 @@ import yaml
 
 from core.database import db
 from core.logger import get_logger
+from repositories import IncidentRepository
 
 _logger = get_logger("vigilant.dispatcher")
 _PROCEDURES_PATH = Path(__file__).parent.parent / "core" / "procedures.yaml"
@@ -103,7 +104,4 @@ class DispatcherService:
         _logger.info("REFETCH_SCHEMA: feature schema reloaded from disk")
 
     def _update_status(self, incident_id: str, status: str) -> None:
-        db.execute(
-            "UPDATE incidents SET status = ? WHERE incident_id = ?",
-            [status, incident_id],
-        )
+        IncidentRepository(db).update_status(incident_id, status)

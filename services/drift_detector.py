@@ -1,7 +1,6 @@
 """Drift detection service — PSI-based checks against PostgreSQL-stored baselines."""
 from __future__ import annotations
 
-import json
 import math
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -14,6 +13,7 @@ import polars as pl
 from pydantic import BaseModel, Field
 
 from core.logger import get_logger
+from repositories import DriftResultRepository, FeatureStatsRepository
 from services.alerting_engine import AlertManager
 
 _logger = get_logger("vigilant.drift")
@@ -54,6 +54,8 @@ class DriftDetector:
     ) -> None:
         self._db = db
         self._alert_manager = alert_manager
+        self._feature_stats_repo = FeatureStatsRepository(db) if db is not None else None
+        self._drift_result_repo = DriftResultRepository(db) if db is not None else None
 
     def check_drift(self, current_df: pl.DataFrame) -> DriftCheckResult:
         """Main entry point — fetches baseline from PostgreSQL then runs drift calculation.
@@ -110,12 +112,9 @@ class DriftDetector:
                 "Drift | feature={} | psi={:.6f} | status={}", feature_name, psi, status
             )
 
-            if self._db is not None:
-                self._db.execute(
-                    "INSERT INTO drift_results "
-                    "(drift_id, feature_name, model_id, method, psi_score, status, n_production_rows) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    [str(uuid.uuid4()), feature_name, "default", "psi", psi, status, len(current_df)],
+            if self._drift_result_repo is not None:
+                self._drift_result_repo.insert(
+                    str(uuid.uuid4()), feature_name, "default", "psi", psi, status, len(current_df)
                 )
 
             if status != "OK":
@@ -154,21 +153,13 @@ class DriftDetector:
         Raises ValueError if the table is empty.
         Raises RuntimeError if no Database was provided at construction time.
         """
-        if self._db is None:
+        if self._feature_stats_repo is None:
             raise RuntimeError("DriftDetector requires a Database instance.")
-        rows = self._db.fetchall(
-            "SELECT feature_name, stats_json FROM feature_stats"
-        )
-        if not rows:
+        result = self._feature_stats_repo.fetch_all()
+        if not result:
             raise ValueError(
                 "Baseline statistics not found in database. Please run init_baseline.py first."
             )
-        result: dict[str, dict] = {}
-        for row in rows:
-            stats = row["stats_json"]
-            if isinstance(stats, str):
-                stats = json.loads(stats)
-            result[row["feature_name"]] = stats
         return result
 
     @staticmethod

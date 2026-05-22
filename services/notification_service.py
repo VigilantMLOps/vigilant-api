@@ -1,13 +1,13 @@
 """Notification service — structured alert dispatch with ClickHouse persistence."""
 from __future__ import annotations
 
-import json
 import uuid
 from enum import Enum
 from typing import Any
 
 from core.database import db
 from core.logger import get_logger
+from repositories import AlertRepository
 
 _logger = get_logger("vigilant.notifications")
 
@@ -61,8 +61,4 @@ def _persist(
     metadata: dict[str, Any],
 ) -> None:
     event_type = metadata.get("event_type", "")
-    db.execute(
-        "INSERT INTO alerts (alert_id, level, event_type, message, metadata) "
-        "VALUES (?, ?, ?, ?, ?)",
-        [alert_id, level.value, event_type, message, json.dumps(metadata)],
-    )
+    AlertRepository(db).create(alert_id, level.value, event_type, message, metadata)
