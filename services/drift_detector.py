@@ -114,7 +114,8 @@ class DriftDetector:
 
             if self._drift_result_repo is not None:
                 self._drift_result_repo.insert(
-                    str(uuid.uuid4()), feature_name, "default", "psi", psi, status, len(current_df)
+                    str(uuid.uuid4()), feature_name, self._db.default_model_id,
+                    "psi", psi, status, len(current_df),
                 )
 
             if status != "OK":

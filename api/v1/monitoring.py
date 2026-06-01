@@ -17,20 +17,18 @@ class ReportRecord(BaseModel):
     report_id: str
     timestamp: datetime
     report_type: str
+    model_id: str | None = None
     model_version: str | None = None
-    metrics: dict[str, Any] | None = None
-    artifacts: dict[str, Any] | None = None
+    content: dict[str, Any] | None = None
 
 
-def _parse_json_fields(row: dict) -> dict:
-    """Deserialize JSON string columns (metrics, artifacts) into Python dicts."""
-    for field in ("metrics", "artifacts"):
-        value = row.get(field)
-        if isinstance(value, str):
-            try:
-                row[field] = _json.loads(value)
-            except _json.JSONDecodeError:
-                pass
+def _parse_content(row: dict) -> dict:
+    value = row.get("content")
+    if isinstance(value, str):
+        try:
+            row["content"] = _json.loads(value)
+        except _json.JSONDecodeError:
+            pass
     return row
 
 
@@ -38,17 +36,19 @@ def _parse_json_fields(row: dict) -> dict:
 def get_latest_report():
     """Return the most recent evaluation report."""
     row = db.fetchone(
-        "SELECT * FROM reports ORDER BY timestamp DESC LIMIT 1"
+        "SELECT report_id, timestamp, report_type, model_id, model_version, content"
+        " FROM reports ORDER BY timestamp DESC LIMIT 1"
     )
     if row is None:
         raise HTTPException(status_code=404, detail="No reports found.")
-    return _parse_json_fields(row)
+    return _parse_content(row)
 
 
 @router.get("/reports/history", response_model=list[ReportRecord])
 def get_report_history():
     """Return the last 10 evaluation reports for trend analysis."""
     rows = db.fetchall(
-        "SELECT * FROM reports ORDER BY timestamp DESC LIMIT 10"
+        "SELECT report_id, timestamp, report_type, model_id, model_version, content"
+        " FROM reports ORDER BY timestamp DESC LIMIT 10"
     )
-    return [_parse_json_fields(row) for row in rows]
+    return [_parse_content(row) for row in rows]

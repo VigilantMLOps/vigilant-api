@@ -154,19 +154,11 @@ CREATE TABLE IF NOT EXISTS report_metrics (
     report_type     LowCardinality(String),
     model_id        LowCardinality(String),
     model_version   LowCardinality(String)      DEFAULT '',
-
-    accuracy        Float32                     DEFAULT 0,
-    precision_score Float32                     DEFAULT 0,
-    recall          Float32                     DEFAULT 0,
-    f1_score        Float32                     DEFAULT 0,
-    roc_auc         Float32                     DEFAULT 0,
-    avg_precision   Float32                     DEFAULT 0,
-
-    n_rows          UInt32                      DEFAULT 0,
-    n_features      UInt16                      DEFAULT 0,
-    imbalance_ratio Float32                     DEFAULT 0,
-    duplicate_rows  UInt32                      DEFAULT 0,
-    missing_cells   UInt32                      DEFAULT 0
+    -- JSON text — shape varies by report_type so each report owns its payload.
+    -- PRE_PROD  → {"accuracy":…, "f1":…, "roc_auc":…, …}
+    -- DATA_EVAL → {"n_rows":…, "imbalance_ratio":…, "missing_cells":…, …}
+    -- DRIFT     → {"n_drifted":…, "drift_rate":…, "features":[…], …}
+    content         String                      DEFAULT '{}'
 )
 ENGINE = ReplacingMergeTree(timestamp)
 PARTITION BY toYYYYMM(timestamp)

@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import os
 import re
+from contextlib import contextmanager
 from pathlib import Path
 
+import clickhouse_connect
 import psycopg2
 import psycopg2.extras
-from clickhouse_driver import Client as ClickHouseClient
 
 from core.logger import get_logger
 
@@ -35,8 +36,12 @@ _TABLE_RE = re.compile(
 # DELETE FROM <table> with no WHERE clause — used by reset_production_log().
 _BARE_DELETE_RE = re.compile(r'DELETE\s+FROM\s+(\w+)\s*$', re.IGNORECASE)
 
-# INSERT INTO <table> (...) VALUES (...) — strip the VALUES part for CH driver.
-_INSERT_VALUES_RE = re.compile(r'\s+VALUES\s*\([\s\S]*\)\s*$', re.IGNORECASE)
+# INSERT INTO <table> (c1, c2, …) VALUES (…) — capture table + column list so
+# we can hand them to clickhouse-connect's bulk insert API.
+_INSERT_RE = re.compile(
+    r'INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(',
+    re.IGNORECASE,
+)
 
 
 def _table_of(sql: str) -> str | None:
@@ -75,14 +80,22 @@ class Database:
 
     def __init__(self) -> None:
         self._pg: psycopg2.extensions.connection | None = None
-        self._ch: ClickHouseClient | None = None
+        self._ch_config: dict | None = None
+        self._default_model_id: str | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
     def startup(self) -> None:
-        """Open both database connections and apply schemas."""
+        """Open the PostgreSQL connection, capture ClickHouse config, apply schemas.
+
+        A long-lived PostgreSQL connection is fine (psycopg2 + autocommit is
+        thread-safe for our usage). ClickHouse uses a fresh client per call —
+        clickhouse-connect's HTTP client errors with 'concurrent queries within
+        the same session' when shared across FastAPI's request threadpool.
+        urllib3 pools the underlying socket so per-call clients are cheap.
+        """
         self._pg = psycopg2.connect(
             host=os.getenv("POSTGRES_HOST", "localhost"),
             port=int(os.getenv("POSTGRES_PORT", "5432")),
@@ -93,25 +106,61 @@ class Database:
         self._pg.autocommit = True
         _logger.info("PostgreSQL connection established.")
 
-        self._ch = ClickHouseClient(
-            host=os.getenv("CLICKHOUSE_HOST", "localhost"),
-            port=int(os.getenv("CLICKHOUSE_PORT", "9000")),
-            database=os.getenv("CLICKHOUSE_DB", "vigilant"),
-            user=os.getenv("CLICKHOUSE_USER", "default"),
-            password=os.getenv("CLICKHOUSE_PASSWORD", ""),
-        )
-        _logger.info("ClickHouse connection established.")
+        self._ch_config = {
+            "host":     os.getenv("CLICKHOUSE_HOST", "localhost"),
+            "port":     int(os.getenv("CLICKHOUSE_PORT", "8123")),
+            "database": os.getenv("CLICKHOUSE_DB", "vigilant"),
+            "username": os.getenv("CLICKHOUSE_USER", "default"),
+            "password": os.getenv("CLICKHOUSE_PASSWORD", ""),
+        }
+        # Sanity-check the config by opening + closing a probe client.
+        probe = clickhouse_connect.get_client(**self._ch_config)
+        probe.close()
+        _logger.info("ClickHouse connection verified.")
 
         self._apply_pg_schema()
         self._apply_ch_schema()
+        self._resolve_default_model_id()
 
     def shutdown(self) -> None:
         if self._pg is not None:
             self._pg.close()
             self._pg = None
-        if self._ch is not None:
-            self._ch.disconnect()
-            self._ch = None
+        self._ch_config = None
+        self._default_model_id = None
+
+    # ------------------------------------------------------------------
+    # Default model resolution
+    # ------------------------------------------------------------------
+
+    DEFAULT_MODEL_NAME = "Malicious detector"
+    DEFAULT_MODEL_VERSION = "v1"
+
+    @property
+    def default_model_id(self) -> str:
+        """UUID of the canonical (name, version) model row. Resolved once at
+        startup; raises if startup hasn't run or the seed row is missing."""
+        if self._default_model_id is None:
+            raise RuntimeError(
+                "default_model_id not resolved — startup() must run first and "
+                f"a models row with ({self.DEFAULT_MODEL_NAME!r}, "
+                f"{self.DEFAULT_MODEL_VERSION!r}) must exist."
+            )
+        return self._default_model_id
+
+    def _resolve_default_model_id(self) -> None:
+        row = self.fetchone(
+            "SELECT model_id FROM models WHERE model_name = ? AND model_version = ?",
+            [self.DEFAULT_MODEL_NAME, self.DEFAULT_MODEL_VERSION],
+        )
+        if row is None:
+            _logger.warning(
+                "No models row for ({}, {}) — default_model_id unresolved.",
+                self.DEFAULT_MODEL_NAME, self.DEFAULT_MODEL_VERSION,
+            )
+            return
+        self._default_model_id = row["model_id"]
+        _logger.info("Resolved default_model_id = {}", self._default_model_id)
 
     # ------------------------------------------------------------------
     # Public query interface — same as the old DuckDB wrapper
@@ -167,11 +216,22 @@ class Database:
     # ClickHouse internals
     # ------------------------------------------------------------------
 
-    @property
-    def _ch_conn(self) -> ClickHouseClient:
-        if self._ch is None:
+    @contextmanager
+    def _ch_client(self):
+        """Construct a fresh ClickHouse client for one operation, then close.
+
+        clickhouse-connect's HTTP client is not safe for concurrent use across
+        threads/requests — it raises 'concurrent queries within the same
+        session'. Creating a per-call client side-steps that; urllib3 keeps
+        the underlying TCP socket warm via its connection pool.
+        """
+        if self._ch_config is None:
             raise RuntimeError("Database not started — call startup() first.")
-        return self._ch
+        client = clickhouse_connect.get_client(**self._ch_config)
+        try:
+            yield client
+        finally:
+            client.close()
 
     def _ch_execute(self, sql: str, params: list) -> None:
         stripped = sql.strip()
@@ -181,30 +241,39 @@ class Database:
         # the correct operation for resetting a full table (production_log reset).
         m = _BARE_DELETE_RE.match(stripped)
         if m:
-            self._ch_conn.execute(f"TRUNCATE TABLE IF EXISTS {m.group(1)}")
+            with self._ch_client() as ch:
+                ch.command(f"TRUNCATE TABLE IF EXISTS {m.group(1)}")
             return
 
-        # INSERT INTO <table> (...) VALUES (?, …)
-        # clickhouse-driver wants the VALUES clause stripped; params are passed
-        # as a list of rows: [[v1, v2, …]].
-        if re.match(r'INSERT\s+INTO', stripped, re.IGNORECASE):
-            prefix = _INSERT_VALUES_RE.sub('', stripped)
-            self._ch_conn.execute(prefix + " VALUES", [params])
+        # INSERT INTO <table> (c1, c2, …) VALUES (?, …)
+        # clickhouse-connect uses the bulk insert API: table name + column
+        # list + a list of rows. Each call is one HTTP POST, no shared state.
+        m = _INSERT_RE.match(stripped)
+        if m:
+            table = m.group(1)
+            columns = [c.strip() for c in m.group(2).split(",")]
+            with self._ch_client() as ch:
+                ch.insert(table, [params], column_names=columns)
             return
 
-        self._ch_conn.execute(stripped, params)
+        with self._ch_client() as ch:
+            ch.command(stripped)
 
     def _ch_fetchall(self, sql: str, params: list) -> list[dict]:
-        rows, col_types = self._ch_conn.execute(sql, params, with_column_types=True)
-        columns = [name for name, _ in col_types]
-        return [dict(zip(columns, row)) for row in rows]
+        # No call site currently passes parameters to a ClickHouse SELECT,
+        # so we forward the SQL as-is. Add `parameters={...}` here later if
+        # that changes — clickhouse-connect uses {name:Type} placeholders.
+        with self._ch_client() as ch:
+            result = ch.query(sql)
+        return [dict(zip(result.column_names, row)) for row in result.result_rows]
 
     def _apply_ch_schema(self) -> None:
         if not _CH_SCHEMA.exists():
             _logger.warning("ClickHouse schema not found: {}", _CH_SCHEMA)
             return
-        for stmt in _split_statements(_CH_SCHEMA.read_text()):
-            self._ch_conn.execute(stmt)
+        with self._ch_client() as ch:
+            for stmt in _split_statements(_CH_SCHEMA.read_text()):
+                ch.command(stmt)
         _logger.info("ClickHouse schema applied.")
 
 

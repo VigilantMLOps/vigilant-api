@@ -21,15 +21,13 @@ _SEED_REPORTS = [
         "timestamp": "2026-01-01T10:00:00+00:00",
         "report_type": "PRE_PROD",
         "model_version": "v1.0-test",
-        "metrics": json.dumps({
+        "content": json.dumps({
             "accuracy": 0.9200,
             "precision": 0.9100,
             "recall": 0.9300,
             "f1": 0.9200,
             "roc_auc": 0.9600,
             "avg_precision": 0.9400,
-        }),
-        "artifacts": json.dumps({
             "confusion_matrix": [[460, 40], [30, 470]],
             "roc_curve_fpr": [0.0, 0.04, 1.0],
             "roc_curve_tpr": [0.0, 0.93, 1.0],
@@ -41,15 +39,13 @@ _SEED_REPORTS = [
         "timestamp": "2026-01-01T11:00:00+00:00",  # newer — becomes the "latest"
         "report_type": "DRIFT",
         "model_version": "v1.0-test",
-        "metrics": json.dumps({
+        "content": json.dumps({
             "accuracy": 0.9500,
             "precision": 0.9400,
             "recall": 0.9600,
             "f1": 0.9500,
             "roc_auc": 0.9800,
             "avg_precision": 0.9700,
-        }),
-        "artifacts": json.dumps({
             "confusion_matrix": [[480, 20], [10, 490]],
             "roc_curve_fpr": [0.0, 0.02, 1.0],
             "roc_curve_tpr": [0.0, 0.96, 1.0],
@@ -60,8 +56,8 @@ _SEED_REPORTS = [
 
 _INSERT_SQL = (
     "INSERT INTO reports "
-    "(report_id, timestamp, report_type, model_version, metrics, artifacts) "
-    "VALUES (?, ?, ?, ?, ?, ?)"
+    "(report_id, timestamp, report_type, model_version, content) "
+    "VALUES (?, ?, ?, ?, ?)"
 )
 
 
@@ -78,8 +74,7 @@ def mock_db() -> FakeDatabase:
                 row["timestamp"],
                 row["report_type"],
                 row["model_version"],
-                row["metrics"],
-                row["artifacts"],
+                row["content"],
             ],
         )
     yield db

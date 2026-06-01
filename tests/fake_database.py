@@ -11,6 +11,7 @@ that DuckDB used, which SQLite also natively supports.
 from __future__ import annotations
 
 import sqlite3
+import uuid
 
 
 class FakeDatabase:
@@ -23,30 +24,39 @@ class FakeDatabase:
         db.shutdown()
     """
 
+    DEFAULT_MODEL_NAME = "Malicious detector"
+    DEFAULT_MODEL_VERSION = "v1"
+
     # Minimal schema: keeps column names that existing service SQL references.
     # Types are all TEXT/INTEGER/REAL; SQLite ignores unknown type names gracefully.
     _SCHEMA = """
+    CREATE TABLE IF NOT EXISTS models (
+        model_id      TEXT PRIMARY KEY,
+        model_name    TEXT NOT NULL,
+        model_version TEXT NOT NULL,
+        display_name  TEXT NOT NULL,
+        model_type    TEXT NOT NULL DEFAULT 'classification',
+        framework     TEXT,
+        api_url       TEXT,
+        description   TEXT,
+        is_active     INTEGER NOT NULL DEFAULT 1,
+        config        TEXT,
+        baseline      TEXT,
+        data_eval     TEXT,
+        pre_prod_eval TEXT,
+        schema_yaml   TEXT,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (model_name, model_version)
+    );
+
     CREATE TABLE IF NOT EXISTS reports (
         report_id       TEXT    PRIMARY KEY,
         timestamp       TEXT    NOT NULL DEFAULT (datetime('now')),
         report_type     TEXT    NOT NULL,
+        model_id        TEXT,
         model_version   TEXT,
-        metrics         TEXT,
-        artifacts       TEXT,
-        accuracy        REAL,
-        precision_score REAL,
-        recall          REAL,
-        f1_score        REAL,
-        roc_auc         REAL,
-        avg_precision   REAL,
-        split           TEXT,
-        stage           TEXT,
-        n_rows          INTEGER,
-        n_features      INTEGER,
-        imbalance_ratio REAL,
-        duplicate_rows  INTEGER,
-        missing_cells   INTEGER,
-        class_distribution TEXT
+        content         TEXT
     );
 
     CREATE TABLE IF NOT EXISTS incidents (
@@ -82,6 +92,7 @@ class FakeDatabase:
         timestamp  TEXT    NOT NULL DEFAULT (datetime('now')),
         level      TEXT    NOT NULL,
         event_type TEXT    NOT NULL DEFAULT '',
+        model_id   TEXT    NOT NULL DEFAULT '',
         message    TEXT    NOT NULL,
         metadata   TEXT    DEFAULT '{}'
     );
@@ -95,22 +106,12 @@ class FakeDatabase:
     );
 
     CREATE TABLE IF NOT EXISTS report_metrics (
-        report_id       TEXT    PRIMARY KEY,
-        timestamp       TEXT    NOT NULL DEFAULT (datetime('now')),
-        report_type     TEXT    NOT NULL DEFAULT '',
-        model_id        TEXT    NOT NULL DEFAULT '',
-        model_version   TEXT    NOT NULL DEFAULT '',
-        accuracy        REAL    DEFAULT 0,
-        precision_score REAL    DEFAULT 0,
-        recall          REAL    DEFAULT 0,
-        f1_score        REAL    DEFAULT 0,
-        roc_auc         REAL    DEFAULT 0,
-        avg_precision   REAL    DEFAULT 0,
-        n_rows          INTEGER DEFAULT 0,
-        n_features      INTEGER DEFAULT 0,
-        imbalance_ratio REAL    DEFAULT 0,
-        duplicate_rows  INTEGER DEFAULT 0,
-        missing_cells   INTEGER DEFAULT 0
+        report_id     TEXT    PRIMARY KEY,
+        timestamp     TEXT    NOT NULL DEFAULT (datetime('now')),
+        report_type   TEXT    NOT NULL DEFAULT '',
+        model_id      TEXT    NOT NULL DEFAULT '',
+        model_version TEXT    NOT NULL DEFAULT '',
+        content       TEXT    NOT NULL DEFAULT '{}'
     );
 
     CREATE TABLE IF NOT EXISTS drift_results (
@@ -129,6 +130,7 @@ class FakeDatabase:
 
     def __init__(self) -> None:
         self._conn: sqlite3.Connection | None = None
+        self._default_model_id: str | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle (same as Database)
@@ -138,11 +140,38 @@ class FakeDatabase:
         self._conn = sqlite3.connect(":memory:", check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(self._SCHEMA)
+        self._seed_default_model()
 
     def shutdown(self) -> None:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
+        self._default_model_id = None
+
+    # ------------------------------------------------------------------
+    # Default model resolution (mirrors core.database.Database)
+    # ------------------------------------------------------------------
+
+    def _seed_default_model(self) -> None:
+        self._default_model_id = str(uuid.uuid4())
+        self._conn.execute(
+            "INSERT INTO models (model_id, model_name, model_version, display_name, model_type)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [
+                self._default_model_id,
+                self.DEFAULT_MODEL_NAME,
+                self.DEFAULT_MODEL_VERSION,
+                self.DEFAULT_MODEL_NAME,
+                "classification",
+            ],
+        )
+        self._conn.commit()
+
+    @property
+    def default_model_id(self) -> str:
+        if self._default_model_id is None:
+            raise RuntimeError("FakeDatabase not started.")
+        return self._default_model_id
 
     # ------------------------------------------------------------------
     # Query interface (same as Database)
@@ -150,14 +179,19 @@ class FakeDatabase:
 
     def execute(self, sql: str, params: list | None = None) -> None:
         assert self._conn is not None, "FakeDatabase not started."
-        self._conn.execute(sql, params or [])
+        self._conn.execute(_strip_pg_casts(sql), params or [])
         self._conn.commit()
 
     def fetchall(self, sql: str, params: list | None = None) -> list[dict]:
         assert self._conn is not None, "FakeDatabase not started."
-        cursor = self._conn.execute(sql, params or [])
+        cursor = self._conn.execute(_strip_pg_casts(sql), params or [])
         return [dict(row) for row in cursor.fetchall()]
 
     def fetchone(self, sql: str, params: list | None = None) -> dict | None:
         rows = self.fetchall(sql, params)
         return rows[0] if rows else None
+
+
+def _strip_pg_casts(sql: str) -> str:
+    """Drop PostgreSQL ``::jsonb`` casts so SQLite can run the same SQL."""
+    return sql.replace("::jsonb", "")

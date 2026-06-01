@@ -23,15 +23,12 @@ async def test_get_latest_report_returns_newest_seed(async_client):
     assert data["model_version"] == "v1.0-test"
     assert data["timestamp"] is not None
 
-    metrics = data["metrics"]
-    assert isinstance(metrics, dict)
-    assert metrics["accuracy"] == pytest.approx(0.95)
-    assert metrics["f1"] == pytest.approx(0.95)
-    assert metrics["roc_auc"] == pytest.approx(0.98)
-
-    artifacts = data["artifacts"]
-    assert isinstance(artifacts, dict)
-    assert artifacts["confusion_matrix"] == [[480, 20], [10, 490]]
+    content = data["content"]
+    assert isinstance(content, dict)
+    assert content["accuracy"] == pytest.approx(0.95)
+    assert content["f1"] == pytest.approx(0.95)
+    assert content["roc_auc"] == pytest.approx(0.98)
+    assert content["confusion_matrix"] == [[480, 20], [10, 490]]
 
 
 async def test_get_latest_report_empty_db(monkeypatch):
@@ -70,5 +67,4 @@ async def test_get_report_history_returns_all_seeds(async_client):
     assert rows[0]["report_id"] == "seed-002"
     assert rows[1]["report_id"] == "seed-001"
     for row in rows:
-        assert isinstance(row["metrics"], dict)
-        assert isinstance(row["artifacts"], dict)
+        assert isinstance(row["content"], dict)

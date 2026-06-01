@@ -189,17 +189,22 @@ def reset_production_log():
 
 class FeatureStatsRow(BaseModel):
     feature_name: str
-    stats_json: str
+    # PostgreSQL JSONB columns deserialize to dict via psycopg2.
+    stats_json: dict[str, Any]
 
 
 @router.get("/reporter/feature-stats", response_model=list[FeatureStatsRow])
-def get_feature_stats():
-    """Return all rows from feature_stats ordered by feature name."""
+def get_feature_stats(model_id: str | None = None):
+    """Return the model's baseline as a list of {feature_name, stats_json} rows,
+    sorted by feature name. Reads from models.baseline. When no model_id is
+    given, falls back to the database's resolved default model."""
     try:
-        rows = db.fetchall(
-            "SELECT feature_name, stats_json FROM feature_stats ORDER BY feature_name"
-        )
-        return rows
+        from repositories import ModelRepository
+        baseline = ModelRepository(db).get_baseline(model_id) or {}
+        return [
+            {"feature_name": name, "stats_json": stats}
+            for name, stats in sorted(baseline.items())
+        ]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

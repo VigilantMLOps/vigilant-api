@@ -56,9 +56,6 @@ class DataLoader:
     """
 
     # Cache keys for named splits / sources
-    _RAW_UNSW = "raw_unsw"
-    _RAW_CICIOT = "raw_ciciot"
-    _RAW_ALL = "raw_all"
     _BLACKLIST = "blacklist"
 
     def __init__(self, paths: DataPaths, *, cache: bool = True) -> None:
@@ -70,11 +67,9 @@ class DataLoader:
     # Pre-production — Raw data
     # ------------------------------------------------------------------
 
-    def load_unsw_nb15(self) -> pl.DataFrame:
-        """Load the four UNSW-NB15 main part files and concatenate."""
-        if self._cache and self._RAW_UNSW in self._store:
-            return self._store[self._RAW_UNSW]
-
+    def load_unsw_nb15(self) -> pl.LazyFrame:
+        """Lazy plan for the four UNSW-NB15 main part files. No data is read
+        until the caller collects (either fully or per-column)."""
         _UNSW_COLS = [
             "srcip", "sport", "dstip", "dsport", "proto", "state", "dur",
             "sbytes", "dbytes", "sttl", "dttl", "sloss", "dloss", "service",
@@ -92,7 +87,7 @@ class DataLoader:
         _schema_overrides = {col: pl.Utf8 for col in _HEX_COLS}
 
         part_glob = str(self._paths.raw.unsw_nb15_dir / "UNSW-NB15_[0-9].csv")
-        df = pl.read_csv(
+        lf = pl.scan_csv(
             part_glob,
             has_header=False,
             new_columns=_UNSW_COLS,
@@ -101,7 +96,7 @@ class DataLoader:
         )
 
         # Normalise hex/decimal strings → Int64 (nulls stay null)
-        df = df.with_columns(
+        return lf.with_columns(
             pl.when(pl.col(c).str.starts_with("0x"))
             .then(pl.col(c).str.slice(2).str.to_integer(base=16, strict=False))
             .otherwise(pl.col(c).cast(pl.Int64, strict=False))
@@ -109,40 +104,35 @@ class DataLoader:
             for c in _HEX_COLS
         )
 
-        if self._cache:
-            self._store[self._RAW_UNSW] = df
-        return df
-
-    def load_ciciot2023(self) -> pl.DataFrame:
-        """Scan all 169 CICIoT2023 part CSVs and concatenate."""
-        if self._cache and self._RAW_CICIOT in self._store:
-            return self._store[self._RAW_CICIOT]
-
+    def load_ciciot2023(self) -> pl.LazyFrame:
+        """Lazy plan for all 169 CICIoT2023 part CSVs."""
         part_glob = str(self._paths.raw.ciciot2023_dir / "part-*.csv")
-        df = pl.read_csv(part_glob, infer_schema_length=10_000)
+        return pl.scan_csv(part_glob, infer_schema_length=10_000)
 
-        if self._cache:
-            self._store[self._RAW_CICIOT] = df
-        return df
+    def load_raw(self) -> pl.LazyFrame:
+        """Lazy plan combining both raw sources (UNSW-NB15 + CICIoT2023).
 
-    def load_raw(self) -> pl.DataFrame:
-        """Load and concatenate both raw sources (UNSW-NB15 + CICIoT2023)."""
-        if self._cache and self._RAW_ALL in self._store:
-            return self._store[self._RAW_ALL]
+        Promotes every integer column to Float64 before the diagonal concat:
+        the streaming engine otherwise hits "integer out of range" errors
+        on diagonal-concatenated LazyFrames where some columns are i64 with
+        large values and others get filled with nulls. Float64 is a safe
+        superset for all numeric stats we compute downstream.
 
-        # Normalise `label` to Utf8 in both sources before stacking —
-        # UNSW-NB15 uses Int64 (0/1) while CICIoT2023 uses String category names.
-        unsw = self.load_unsw_nb15().with_columns(pl.col("label").cast(pl.Utf8))
-        ciciot = self.load_ciciot2023().with_columns(pl.col("label").cast(pl.Utf8))
+        `label` is cast to Utf8 in both sources because UNSW-NB15 uses
+        Int64 (0/1) while CICIoT2023 uses String category names.
+        """
+        def _widen(lf: pl.LazyFrame) -> pl.LazyFrame:
+            # Exclude `label` — it's promoted to Utf8 separately below, and
+            # casting through Float64 first would turn "0" into "0.0".
+            int_cols = [
+                name for name, dt in lf.collect_schema().items()
+                if dt.is_integer() and name != "label"
+            ]
+            return lf.with_columns(pl.col(c).cast(pl.Float64) for c in int_cols)
 
-        df = pl.concat(
-            [unsw, ciciot],
-            how="diagonal",  # fills missing columns with null
-        )
-
-        if self._cache:
-            self._store[self._RAW_ALL] = df
-        return df
+        unsw = _widen(self.load_unsw_nb15()).with_columns(pl.col("label").cast(pl.Utf8))
+        ciciot = _widen(self.load_ciciot2023()).with_columns(pl.col("label").cast(pl.Utf8))
+        return pl.concat([unsw, ciciot], how="diagonal")
 
     # ------------------------------------------------------------------
     # Pre-production — Processed (balanced final stage)
