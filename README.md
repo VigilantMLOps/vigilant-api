@@ -9,6 +9,15 @@ FastAPI backend for the Vigilant MLOps platform. Provides endpoints for ML model
 - **Repository layer** — every SQL statement lives in `repositories/`. Services and routes depend on these interfaces, not on the database wrapper directly.
 - **In-memory test backend** — `tests/fake_database.py` implements the same `Database` interface against SQLite, so the full suite runs in ~0.1s with no real databases needed.
 
+
+
+
+<img width="1376" height="768" alt="Gemini_Generated_Image_n40oden40oden40o" src="https://github.com/user-attachments/assets/e2339378-843a-42fa-ad98-ebb20fdac9b9" />
+
+
+
+
+
 ## Tech Stack
 
 - **Python 3.12** + **FastAPI** + **Uvicorn**
