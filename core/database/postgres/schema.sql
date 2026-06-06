@@ -3,9 +3,9 @@
 --
 -- Responsibility boundary:
 --   PostgreSQL owns all mutable, relational state:
---     · models        — model registry (FK anchor for multi-model scaling)
---     · feature_stats — drift baselines per (model_id, feature_name)
---     · reports       — evaluation results (pre-prod + drift)
+--     · models        — model registry; each row carries its baseline,
+--                       latest static evals, and schema snapshot as JSONB
+--     · reports       — evaluation event log (PRE_PROD + DATA_EVAL + DRIFT)
 --     · incidents     — alert lifecycle with UPDATE-able status
 --
 -- ClickHouse owns all append-only, high-volume analytics:
@@ -63,13 +63,24 @@ $$;
 -- ---------------------------------------------------------------------------
 -- models
 -- Registry of all ML and LLM models managed by the platform.
--- FK anchor for feature_stats, reports, and incidents.
--- A 'default' seed row is inserted so existing services that don't yet
--- pass a model_id can still write to feature_stats without FK violations.
+-- FK anchor for reports and incidents.
+--
+-- Each row carries its own static state as JSONB:
+--   baseline       — {feature_name: stats_json}, used by the drift detector
+--                    (replaces the old per-row feature_stats table)
+--   data_eval      — {"<stage>.<split>": eval}, latest pre-production data
+--                    profile per stage/split
+--   pre_prod_eval  — latest pre-production test-set evaluation
+--   schema_yaml    — snapshot of core/ml_engine/schema.yaml at registration
+--
+-- A 'default' seed row is inserted so legacy code paths that don't pass
+-- a model_id can still attribute writes.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS models (
     model_id        VARCHAR(255)    PRIMARY KEY,
+    model_name      VARCHAR(255)    NOT NULL,
+    model_version   VARCHAR(255)    NOT NULL,
     display_name    VARCHAR(255)    NOT NULL,
     -- classification | regression | llm | embedding | other
     model_type      VARCHAR(50)     NOT NULL DEFAULT 'classification',
@@ -78,8 +89,14 @@ CREATE TABLE IF NOT EXISTS models (
     description     TEXT,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
     config          JSONB,
+    baseline        JSONB,
+    data_eval       JSONB,
+    pre_prod_eval   JSONB,
+    schema_yaml     JSONB,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    -- Two models can share a name but not a (name, version) pair.
+    CONSTRAINT models_name_version_unique UNIQUE (model_name, model_version)
 );
 
 CREATE INDEX IF NOT EXISTS idx_models_active
@@ -90,56 +107,23 @@ CREATE TRIGGER trg_models_updated_at
     BEFORE UPDATE ON models
     FOR EACH ROW EXECUTE FUNCTION _set_updated_at();
 
--- Seed row so feature_stats FK is satisfied before any model is registered.
-INSERT INTO models (model_id, display_name, model_type)
-VALUES ('default', 'Default Model', 'classification')
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------------------------
--- feature_stats
--- Baseline distributions computed from training data for drift detection.
---
--- Primary key: (model_id, feature_name) for multi-model support.
--- `stats_json` keeps the original column name so DriftDetector SQL works
--- without changes. Typed numeric summary columns are added alongside for
--- the next migration step.
--- ---------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS feature_stats (
-    model_id        VARCHAR(255)        NOT NULL DEFAULT 'default',
-    feature_name    VARCHAR(255)        NOT NULL,
-    stat_type       feature_type_enum,
-
-    -- Typed summary stats (NULL until services are updated to write them)
-    mean            DOUBLE PRECISION,
-    std_dev         DOUBLE PRECISION,
-    min_val         DOUBLE PRECISION,
-    max_val         DOUBLE PRECISION,
-    p25             DOUBLE PRECISION,
-    p50             DOUBLE PRECISION,
-    p75             DOUBLE PRECISION,
-
-    -- Full distribution for PSI — original column name preserved for compat.
-    -- numeric:     {"bins": [...], "counts": [...]}
-    -- categorical: {"tcp": 0.45, "udp": 0.42, ...}
-    stats_json      JSONB               NOT NULL DEFAULT '{}',
-
-    updated_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-
-    PRIMARY KEY (model_id, feature_name),
-    FOREIGN KEY (model_id) REFERENCES models (model_id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_feature_stats_model
-    ON feature_stats (model_id);
+-- Seed the canonical "Malicious detector" v1 model. App code resolves the
+-- generated UUID at startup by querying (model_name, model_version) so
+-- different installs end up with different UUIDs without code changes.
+INSERT INTO models (model_id, model_name, model_version, display_name, model_type)
+VALUES (gen_random_uuid()::TEXT, 'Malicious detector', 'v1', 'Malicious detector', 'classification')
+ON CONFLICT (model_name, model_version) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- reports
--- Evaluation reports written at pre-production and drift check time.
+-- Event log of evaluation reports. Three types share one table; the
+-- type-specific payload lives in `content` (JSONB) so each shape can evolve
+-- independently:
+--   PRE_PROD  → {"accuracy":…, "f1":…, "confusion_matrix":[…], …}
+--   DATA_EVAL → {"split":…, "stage":…, "n_rows":…, "features":[…], …}
+--   DRIFT     → {"n_drifted":…, "drift_rate":…, "features":[…], …}
 --
--- `timestamp` column name is kept (not renamed to `created_at`) so that
--- monitoring.py queries like `ORDER BY timestamp DESC` continue to work.
--- `metrics JSONB` is kept alongside typed metric columns for the same reason.
+-- Only cross-type metadata is kept as plain columns (filter/order targets).
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS reports (
@@ -148,33 +132,7 @@ CREATE TABLE IF NOT EXISTS reports (
     report_type     report_type_enum    NOT NULL,
     model_id        VARCHAR(255)        REFERENCES models (model_id) ON DELETE SET NULL,
     model_version   VARCHAR(255),
-
-    -- Original JSON blob — kept for backward compat with service SELECT queries.
-    -- PRE_PROD: {"accuracy":…, "f1":…, "roc_auc":…, …}
-    -- DATA_EVAL: {"n_rows":…, "class_distribution":…, …}
-    metrics         JSONB,
-
-    -- Heavy artifacts: confusion matrix, ROC arrays, per-feature profile list.
-    artifacts       JSONB,
-
-    -- Typed metric columns (NULL until service inserts are updated).
-    -- Enables ORDER BY / WHERE on metrics without JSONB extraction.
-    accuracy        DOUBLE PRECISION,
-    precision_score DOUBLE PRECISION,
-    recall          DOUBLE PRECISION,
-    f1_score        DOUBLE PRECISION,
-    roc_auc         DOUBLE PRECISION,
-    avg_precision   DOUBLE PRECISION,
-
-    -- DATA_EVAL quality metrics
-    split           VARCHAR(50),
-    stage           VARCHAR(50),
-    n_rows          INTEGER,
-    n_features      SMALLINT,
-    imbalance_ratio DOUBLE PRECISION,
-    duplicate_rows  INTEGER,
-    missing_cells   INTEGER,
-    class_distribution JSONB
+    content         JSONB
 );
 
 CREATE INDEX IF NOT EXISTS idx_reports_timestamp

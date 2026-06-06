@@ -1,4 +1,4 @@
-.PHONY: help up down logs dev db-init db-reset db-status seed migration init-baseline test
+.PHONY: help up down logs dev db-init db-reset db-status seed seed-snapshot db-dump db-restore migration init-baseline test
 
 -include .env
 export
@@ -7,7 +7,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 up: ## Start all services (postgres, clickhouse, api) in the background
-	docker compose up -d --build
+	docker compose up --build
 
 down: ## Stop and remove all containers
 	docker compose down
@@ -20,6 +20,14 @@ dev: ## Start the FastAPI backend with hot reload (requires running databases)
 
 seed: ## Seed the DB: evaluate-data → evaluate-model → evaluate-drift (×3 batches). Use ARGS="--skip <stage>" to skip stages
 	poetry run python scripts/seed.py $(ARGS)
+
+seed-snapshot: seed db-dump ## Seed locally, then snapshot the volumes for transfer to another host
+
+db-dump: ## Snapshot the postgres+clickhouse volumes to a dir (stops services briefly). Usage: make db-dump [DIR=./snapshots]
+	bash scripts/db_snapshot.sh dump $(DIR)
+
+db-restore: ## Restore postgres+clickhouse volumes from a snapshot. Usage: make db-restore [DIR=./snapshots] [FORCE=1]
+	bash scripts/db_snapshot.sh restore $(DIR)
 
 migration: ## Create a new migration. Usage: make migration NAME=add_new_table
 	poetry run python scripts/migration.py $(NAME)

@@ -1,0 +1,11 @@
+{
+  "backend_url": "http://localhost:8000/api/v1",
+  "ml_serve": {
+    "dir": "../vigilant-mlops/apps/ml-serve",
+    "port": 8001,
+    "uvicorn_bin": ".venv/bin/uvicorn",
+    "app_module": "main:app"
+  },
+  "notebooks_dir": "notebooks",
+  "drift_examples": ["example1.json", "example2.json", "example3.json"]
+}

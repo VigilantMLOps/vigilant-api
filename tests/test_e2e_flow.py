@@ -75,25 +75,24 @@ _NUMERIC = {k for k in _REFERENCE_RECORDS[0] if k not in _CATEGORICAL}
 
 
 def _seed_feature_stats(db: FakeDatabase) -> None:
-    """Populate feature_stats with baselines computed from _REFERENCE_RECORDS.
+    """Populate models.baseline with feature stats computed from _REFERENCE_RECORDS.
 
-    DriftDetector._fetch_baseline_stats() requires at least one row here or
-    it raises ValueError. The baselines are computed from the reference
-    distribution so drift against the drifted payload is guaranteed to fire.
+    DriftDetector._fetch_baseline_stats() reads from models.baseline (via
+    FeatureStatsRepository → ModelRepository) and requires at least one
+    feature or it raises ValueError. The baselines are computed from the
+    reference distribution so drift against the drifted payload is
+    guaranteed to fire.
     """
     ref_df = pl.DataFrame(_REFERENCE_RECORDS)
+    baseline: dict[str, dict] = {}
 
     for col in _NUMERIC:
         arr = ref_df[col].cast(pl.Float64, strict=False).fill_null(0.0).to_numpy()
         counts, bin_edges = np.histogram(arr, bins=10)
-        stats = {
+        baseline[col] = {
             "type": "numeric",
             "histogram": {"bins": bin_edges.tolist(), "counts": counts.tolist()},
         }
-        db.execute(
-            "INSERT INTO feature_stats (feature_name, stats_json) VALUES (?, ?)",
-            [col, json.dumps(stats)],
-        )
 
     for col in _CATEGORICAL:
         series = ref_df[col].cast(pl.Utf8)
@@ -104,11 +103,12 @@ def _seed_feature_stats(db: FakeDatabase) -> None:
             str(row[val_col]): round(row[cnt_col] / total, 8)
             for row in vc.iter_rows(named=True)
         }
-        stats = {"type": "categorical", "distribution": distribution}
-        db.execute(
-            "INSERT INTO feature_stats (feature_name, stats_json) VALUES (?, ?)",
-            [col, json.dumps(stats)],
-        )
+        baseline[col] = {"type": "categorical", "distribution": distribution}
+
+    db.execute(
+        "UPDATE models SET baseline = ? WHERE model_id = ?",
+        [json.dumps(baseline), db.default_model_id],
+    )
 
 
 # ---------------------------------------------------------------------------

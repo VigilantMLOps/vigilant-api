@@ -14,31 +14,43 @@ Connection is configured via environment variables:
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
+import clickhouse_connect
 import psycopg2
 import psycopg2.extras
-from clickhouse_driver import Client as ClickHouseClient
+from clickhouse_connect.driver.client import Client as ClickHouseClient
 
 _BASE     = Path(__file__).resolve().parent
 _PG_SCHEMA = _BASE / "database" / "postgres"   / "schema.sql"
 _CH_SCHEMA = _BASE / "database" / "clickhouse" / "schema.sql"
+_PG_MIGRATIONS = _BASE / "database" / "postgres" / "migrations"
 
 
 # ── Migration registry ────────────────────────────────────────────────────────
-# To add a new migration, append a Migration with the next version number and
-# list the SQL files or inline ALTER statements to run on each backend.
-# The version is recorded in PostgreSQL's schema_migrations only after all
-# statements on both databases succeed.
+# Each Migration carries per-version SQL paths for whichever backends it
+# changes. `None` means "no changes on that side for this version" — the
+# runner skips it. The migration is only recorded in schema_migrations once
+# all listed sides succeed.
 
 @dataclass(frozen=True)
 class Migration:
     version: int
     description: str
+    pg_sql: Path | None = None
+    ch_sql: Path | None = None
+    # Optional Python runner that runs after pg_sql + ch_sql. Use this for
+    # cross-DB operations (e.g. generating a UUID in PostgreSQL and
+    # propagating it into ClickHouse tables in the same migration step).
+    # Spec: "module.path:function_name" where the function accepts
+    # (pg_connection, ch_client) and returns None.
+    runner: str | None = None
 
 
 MIGRATIONS: list[Migration] = [
@@ -48,8 +60,47 @@ MIGRATIONS: list[Migration] = [
             "Initial dual-DB schema: PostgreSQL (models, feature_stats, reports, incidents)"
             " + ClickHouse (production_log, alerts, drift_results, report_metrics, llm_traces)"
         ),
+        pg_sql=_PG_SCHEMA,
+        ch_sql=_CH_SCHEMA,
+    ),
+    Migration(
+        version=2,
+        description=(
+            "Consolidate per-feature baselines and static evals onto models"
+            " (models.baseline / data_eval / pre_prod_eval / schema_yaml; drop feature_stats)"
+        ),
+        pg_sql=_PG_MIGRATIONS / "v002_consolidate_models.sql",
+    ),
+    Migration(
+        version=3,
+        description=(
+            "Collapse reports type-specific columns into a single `content` JSONB"
+            " (PRE_PROD / DATA_EVAL / DRIFT share one shape; content varies by type)"
+        ),
+        pg_sql=_PG_MIGRATIONS / "v003_reports_content_jsonb.sql",
+    ),
+    Migration(
+        version=4,
+        description=(
+            "Model identity: add name + version + UNIQUE on models, replace 'default'"
+            " with a generated UUID across PG and CH, collapse report_metrics into content"
+        ),
+        pg_sql=_PG_MIGRATIONS / "v004_model_identity_pg.sql",
+        ch_sql=_BASE / "database" / "clickhouse" / "migrations" / "v004_model_identity_ch.sql",
+        runner="core.database.migrations.v004_model_identity:run",
     ),
 ]
+
+
+# ── Runner loader ─────────────────────────────────────────────────────────────
+
+def _resolve_runner(spec: str) -> Callable:
+    """Resolve a 'module.path:function_name' spec to the callable."""
+    module_path, _, func_name = spec.partition(":")
+    if not module_path or not func_name:
+        raise ValueError(f"Invalid runner spec '{spec}' — expected 'module:function'")
+    module = importlib.import_module(module_path)
+    return getattr(module, func_name)
 
 
 # ── Connection helpers ────────────────────────────────────────────────────────
@@ -67,11 +118,11 @@ def _pg_connect() -> psycopg2.extensions.connection:
 
 
 def _ch_connect() -> ClickHouseClient:
-    return ClickHouseClient(
+    return clickhouse_connect.get_client(
         host=os.getenv("CLICKHOUSE_HOST", "localhost"),
-        port=int(os.getenv("CLICKHOUSE_PORT", "9000")),
+        port=int(os.getenv("CLICKHOUSE_PORT", "8123")),
         database=os.getenv("CLICKHOUSE_DB", "vigilant"),
-        user=os.getenv("CLICKHOUSE_USER", "default"),
+        username=os.getenv("CLICKHOUSE_USER", "default"),
         password=os.getenv("CLICKHOUSE_PASSWORD", ""),
     )
 
@@ -126,15 +177,26 @@ def init() -> None:
         for m in pending:
             print(f"Applying v{m.version}: {m.description}")
 
-            print("  → PostgreSQL ...")
-            with pg.cursor() as cur:
-                cur.execute(_PG_SCHEMA.read_text())
-            print("  ✓ PostgreSQL done.")
+            if m.pg_sql is not None:
+                print(f"  → PostgreSQL ({m.pg_sql.name}) ...")
+                with pg.cursor() as cur:
+                    cur.execute(m.pg_sql.read_text())
+                print("  ✓ PostgreSQL done.")
+            else:
+                print("  · PostgreSQL — no changes.")
 
-            print("  → ClickHouse ...")
-            for stmt in _split_statements(_CH_SCHEMA.read_text()):
-                ch.execute(stmt)
-            print("  ✓ ClickHouse done.")
+            if m.ch_sql is not None:
+                print(f"  → ClickHouse ({m.ch_sql.name}) ...")
+                for stmt in _split_statements(m.ch_sql.read_text()):
+                    ch.command(stmt)
+                print("  ✓ ClickHouse done.")
+            else:
+                print("  · ClickHouse — no changes.")
+
+            if m.runner is not None:
+                print(f"  → runner ({m.runner}) ...")
+                _resolve_runner(m.runner)(pg, ch)
+                print("  ✓ runner done.")
 
             _record(pg, m)
             print(f"  v{m.version} recorded in schema_migrations.")
@@ -142,7 +204,7 @@ def init() -> None:
         print(f"\nBoth databases ready at schema version {_current_version(pg)}.")
     finally:
         pg.close()
-        ch.disconnect()
+        ch.close()
 
 
 def reset() -> None:
@@ -177,13 +239,13 @@ def reset() -> None:
             print(f"  Dropped PG enum: {enum}")
 
         # ClickHouse: drop all tables in the current database
-        for (table,) in ch.execute("SHOW TABLES"):
-            ch.execute(f"DROP TABLE IF EXISTS {table}")
+        for (table,) in ch.query("SHOW TABLES").result_rows:
+            ch.command(f"DROP TABLE IF EXISTS {table}")
             print(f"  Dropped CH table: {table}")
 
     finally:
         pg.close()
-        ch.disconnect()
+        ch.close()
 
     init()
 

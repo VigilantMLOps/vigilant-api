@@ -1,13 +1,13 @@
 """
 Baseline initialization script — computes per-feature statistics from a training
-file and stores them in the PostgreSQL `feature_stats` table.
+file and stores them on the target model's row as `models.baseline`.
 
 Run from the project root:
     python scripts/init_baseline.py --input /path/to/training.csv
     python scripts/init_baseline.py --input /path/to/training.parquet
 
-The script is idempotent: it clears all rows for the target model before
-inserting, so re-running with updated training data produces a clean baseline.
+The script is idempotent: each run overwrites models.baseline and
+models.schema_yaml for the target model_id.
 
 The backend can be running while this script executes — PostgreSQL supports
 concurrent writers, unlike the old DuckDB setup.
@@ -16,12 +16,11 @@ Both PostgreSQL and ClickHouse must be reachable (configured via env vars).
 Connection defaults:
     POSTGRES_HOST=localhost  POSTGRES_PORT=5432  POSTGRES_DB=vigilant
     POSTGRES_USER=vigilant   POSTGRES_PASSWORD=vigilant
-    CLICKHOUSE_HOST=localhost CLICKHOUSE_PORT=9000 CLICKHOUSE_DB=vigilant
+    CLICKHOUSE_HOST=localhost CLICKHOUSE_PORT=8123 CLICKHOUSE_DB=vigilant
 """
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -33,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.database import Database  # noqa: E402
 from core.logger import get_logger  # noqa: E402
+from repositories import ModelRepository  # noqa: E402
 
 _logger = get_logger("vigilant.init_baseline")
 
@@ -75,7 +75,7 @@ def _categorical_stats(series: pl.Series) -> dict:
     }
 
 
-def run(input_path: Path, model_id: str = "default") -> None:
+def run(input_path: Path, model_id: str | None = None) -> None:
     _logger.info("Loading training data from {}", input_path)
 
     suffix = input_path.suffix.lower()
@@ -96,55 +96,43 @@ def run(input_path: Path, model_id: str = "default") -> None:
     db.startup()
 
     try:
-        # Clear existing baselines for this model so re-runs are idempotent.
-        # feature_stats is routed to PostgreSQL; DELETE without WHERE removes all rows.
-        db.execute(
-            "DELETE FROM feature_stats WHERE model_id = ?",
-            [model_id],
-        )
-        _logger.info("Cleared existing feature_stats for model_id='{}'", model_id)
+        models = ModelRepository(db)
+        # Default to the canonical seed model (Malicious detector / v1) when
+        # no model_id is given. The seed row is created by the v4 migration
+        # and resolved at db.startup().
+        if model_id is None:
+            model_id = db.default_model_id
 
-        inserted = 0
+        baseline: dict[str, dict] = {}
 
         for feature_name in numeric_features:
             if feature_name not in df.columns:
                 _logger.warning("Numeric feature '{}' not in dataset — skipping", feature_name)
                 continue
             stats = _numeric_stats(df[feature_name])
-            db.execute(
-                "INSERT INTO feature_stats (model_id, feature_name, stats_json)"
-                " VALUES (?, ?, ?)"
-                " ON CONFLICT (model_id, feature_name) DO UPDATE SET"
-                "   stats_json = EXCLUDED.stats_json,"
-                "   updated_at = NOW()",
-                [model_id, feature_name, json.dumps(stats)],
-            )
+            baseline[feature_name] = stats
             _logger.info(
                 "  [numeric]      {} — mean={}, std={}",
                 feature_name, stats["mean"], stats["std"],
             )
-            inserted += 1
 
         for feature_name in categorical_features:
             if feature_name not in df.columns:
                 _logger.warning("Categorical feature '{}' not in dataset — skipping", feature_name)
                 continue
             stats = _categorical_stats(df[feature_name])
-            db.execute(
-                "INSERT INTO feature_stats (model_id, feature_name, stats_json)"
-                " VALUES (?, ?, ?)"
-                " ON CONFLICT (model_id, feature_name) DO UPDATE SET"
-                "   stats_json = EXCLUDED.stats_json,"
-                "   updated_at = NOW()",
-                [model_id, feature_name, json.dumps(stats)],
-            )
+            baseline[feature_name] = stats
             _logger.info(
                 "  [categorical]  {} — {} categories",
                 feature_name, len(stats["distribution"]),
             )
-            inserted += 1
 
-        _logger.info("Done. {} features stored in feature_stats (model_id='{}').", inserted, model_id)
+        models.set_baseline(model_id, baseline)
+        models.set_schema_yaml(model_id, schema)
+        _logger.info(
+            "Done. {} features stored in models.baseline (model_id='{}').",
+            len(baseline), model_id,
+        )
 
     finally:
         db.shutdown()
@@ -161,8 +149,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--model-id",
-        default="default",
-        help="Model ID to store baselines under (default: 'default')",
+        default=None,
+        help="Model UUID to store baselines under. Defaults to the seed model"
+             " resolved by (model_name='Malicious detector', model_version='v1').",
     )
     args = parser.parse_args()
 
