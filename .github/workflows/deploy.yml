@@ -1,0 +1,26 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    tags:
+      - 'deploy.api.*'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH + pull + rebuild
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/vigilant-api
+            git fetch --all --tags
+            git checkout "${{ github.ref_name }}"
+            docker compose --profile prod build api caddy
+            docker compose --profile prod up -d
+            docker image prune -f
