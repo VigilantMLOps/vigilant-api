@@ -1,0 +1,85 @@
+services:
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       vigilant
+      POSTGRES_USER:     vigilant
+      POSTGRES_PASSWORD: vigilant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigilant -d vigilant"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB:       vigilant
+      CLICKHOUSE_USER:     default
+      CLICKHOUSE_PASSWORD: ""
+    ports:
+      - "8123:8123"   # HTTP — used by clickhouse-connect and ad-hoc queries
+      - "9000:9000"   # native (TCP) — kept for clickhouse-client CLI access
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - CLICKHOUSE_HOST=clickhouse
+      # ml-serve runs on the host (legacy vigilant-mlops repo) — use the
+      # Docker-provided host DNS name to reach it from inside the container.
+      - MODEL_API_URL=http://host.docker.internal:8001
+    volumes:
+      # Mount the dataset directory expected by config/reporter.json (/data/...).
+      # Override the host path via DATA_DIR in .env if the legacy repo lives
+      # elsewhere on your machine.
+      - ${DATA_DIR:-../vigilant-mlops/artifacts/data}:/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - CADDY_DOMAIN=${CADDY_DOMAIN:-}
+    depends_on:
+      - api
+    profiles: ["prod"]
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  caddy_data:
+  caddy_config:

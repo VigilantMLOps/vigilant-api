@@ -44,6 +44,7 @@ from sklearn.metrics import (
 )
 
 from core.logger import get_logger
+from repositories import ModelRepository, ProductionLogRepository, ReportRepository
 from .alerting_engine import AlertManager
 from .data_loader import DataLoader, DataPaths
 
@@ -262,6 +263,14 @@ def _resolve_feature_cols(df: pl.DataFrame, cfg: ReporterConfig) -> list[str]:
     return [c for c in df.columns if c != cfg.target_column]
 
 
+def _round_or_none(v: Any) -> float | None:
+    """Round a polars-streaming aggregation result, returning None for null/NaN."""
+    if v is None:
+        return None
+    f = float(v)
+    return None if f != f else round(f, 6)  # f != f → NaN
+
+
 def _compute_feature_stats(series: pl.Series) -> FeatureStats:
     n = series.len()
     null_count = series.null_count()
@@ -383,6 +392,9 @@ class ReporterService:
         self._baseline: ModelEvaluationResult | None = None
         self._db = db
         self._alert_manager = alert_manager
+        self._report_repo = ReportRepository(db) if db is not None else None
+        self._model_repo = ModelRepository(db) if db is not None else None
+        self._production_log_repo = ProductionLogRepository(db) if db is not None else None
 
     # ------------------------------------------------------------------
     # Pre-Production — 1: Data Evaluation
@@ -425,6 +437,106 @@ class ReporterService:
             features=[_compute_feature_stats(df[col]) for col in feature_cols],
         )
 
+    def _evaluate_lazy(self, lf: pl.LazyFrame, split_name: str) -> DataEvaluationResult:
+        """Streaming profiler for very large lazy plans (raw CSV stages).
+
+        Builds a single LazyFrame.select(...) with one aggregation per
+        column-stat pair, then collects with the streaming engine — polars
+        scans the CSVs once in chunks, accumulating results, instead of
+        materialising any column in full. Bounded peak memory regardless
+        of source size.
+
+        Trade-offs vs. the eager `_evaluate_df`:
+          * quantiles (p25/p50/p75) are omitted — exact quantiles require
+            buffering the whole column and don't stream
+          * duplicate_rows is 0 — duplicate detection requires full
+            materialisation; raw-stage duplicate counts aren't load-bearing
+          * n_unique uses polars' streaming hash set; high-cardinality
+            columns trade some memory for the count (still far below
+            holding the whole column)
+        """
+        target = self.config.target_column
+        schema = lf.collect_schema()
+        columns = schema.names()
+        feature_cols = [c for c in columns if c != target]
+
+        def _stats_exprs(col: str, is_numeric: bool) -> list[pl.Expr]:
+            base = [
+                pl.col(col).null_count().alias(f"{col}__nulls"),
+                pl.col(col).n_unique().alias(f"{col}__nuniq"),
+            ]
+            if is_numeric:
+                base.extend([
+                    pl.col(col).min().alias(f"{col}__min"),
+                    pl.col(col).max().alias(f"{col}__max"),
+                    pl.col(col).mean().alias(f"{col}__mean"),
+                    pl.col(col).std().alias(f"{col}__std"),
+                ])
+            return base
+
+        agg_exprs: list[pl.Expr] = [pl.len().alias("__n_rows__")]
+        for col in columns:
+            agg_exprs.extend(_stats_exprs(col, schema[col].is_numeric()))
+
+        agg_row = lf.select(agg_exprs).collect(engine="streaming").row(0, named=True)
+        n_rows = int(agg_row["__n_rows__"])
+
+        if target in columns:
+            # group_by on the target column streams (one int / small string per row).
+            vc_df = (
+                lf.group_by(target)
+                .len()
+                .collect(engine="streaming")
+                .sort(target)
+            )
+            dist: dict[str, int] = dict(zip(
+                vc_df[target].cast(pl.String).to_list(),
+                vc_df["len"].to_list(),
+            ))
+            counts = list(dist.values())
+            imbalance = (
+                round(max(counts) / min(counts), 4)
+                if len(counts) > 1 and min(counts) > 0
+                else 1.0
+            )
+        else:
+            dist = {}
+            imbalance = 0.0
+
+        missing_cells = 0
+        features: list[FeatureStats] = []
+        for col in columns:
+            nulls = int(agg_row[f"{col}__nulls"])
+            missing_cells += nulls
+            if col == target:
+                continue
+            stats: dict[str, Any] = {
+                "name": col,
+                "dtype": str(schema[col]),
+                "missing_count": nulls,
+                "missing_pct": round(nulls / n_rows, 4) if n_rows > 0 else 0.0,
+                "n_unique": int(agg_row[f"{col}__nuniq"]),
+            }
+            if schema[col].is_numeric():
+                stats.update(
+                    min=_round_or_none(agg_row[f"{col}__min"]),
+                    max=_round_or_none(agg_row[f"{col}__max"]),
+                    mean=_round_or_none(agg_row[f"{col}__mean"]),
+                    std=_round_or_none(agg_row[f"{col}__std"]),
+                )
+            features.append(FeatureStats(**stats))
+
+        return DataEvaluationResult(
+            split=split_name,
+            n_rows=n_rows,
+            n_features=len(feature_cols),
+            class_distribution=dist,
+            imbalance_ratio=imbalance,
+            duplicate_rows=0,
+            missing_cells=missing_cells,
+            features=features,
+        )
+
     def evaluate_all_data(self) -> dict[str, dict[str, Any]]:
         """
         Profile every data stage and split in one call.
@@ -451,7 +563,9 @@ class ReporterService:
         raw: dict[str, Any] = {}
         for name, load_fn in raw_sources.items():
             try:
-                result = self._evaluate_df(load_fn(), name)
+                # Raw loaders return LazyFrames; stream them per-column to
+                # keep peak memory bounded (each source is multi-GB).
+                result = self._evaluate_lazy(load_fn(), name)
                 raw[name] = result
                 if self._db is not None:
                     self._save_data_eval_to_db(result, stage="raw")
@@ -472,11 +586,11 @@ class ReporterService:
         """
         Send the test set to the remote model API and compute classification metrics.
         Stores the result as the production baseline for later decay tracking.
-        Automatically persists the report to DuckDB if the service was given a db instance.
+        Automatically persists the report to PostgreSQL if the service was given a db instance.
 
         df: optional labeled DataFrame (features + target column). When omitted the
             service tries to load the test parquet from disk; if unavailable it falls
-            back to the latest PRE_PROD report stored in DuckDB.
+            back to the latest PRE_PROD report stored in PostgreSQL.
         """
         if df is None:
             try:
@@ -700,9 +814,10 @@ class ReporterService:
     # ------------------------------------------------------------------
 
     def _save_data_eval_to_db(self, result: DataEvaluationResult, *, stage: str) -> str:
-        """Persist a DataEvaluationResult to the reports table as report_type='DATA_EVAL'."""
+        """Persist a DataEvaluationResult to the reports table as report_type='DATA_EVAL',
+        and merge the latest snapshot onto models.data_eval keyed by '<stage>.<split>'."""
         report_id = str(uuid.uuid4())
-        metrics = json.dumps({
+        content = {
             "split": result.split,
             "stage": stage,
             "n_rows": result.n_rows,
@@ -711,15 +826,20 @@ class ReporterService:
             "imbalance_ratio": result.imbalance_ratio,
             "duplicate_rows": result.duplicate_rows,
             "missing_cells": result.missing_cells,
-        })
-        artifacts = json.dumps({
             "features": [f.model_dump() for f in result.features],
-        })
-        self._db.execute(
-            "INSERT INTO reports (report_id, report_type, model_version, metrics, artifacts) "
-            "VALUES (?, ?, ?, ?, ?)",
-            [report_id, "DATA_EVAL", f"{stage}/{result.split}", metrics, artifacts],
+        }
+        self._report_repo.insert_data_eval(
+            report_id=report_id,
+            content=content,
+            model_version=f"{stage}/{result.split}",
         )
+        if self._model_repo is not None:
+            self._model_repo.upsert_data_eval(
+                model_id=self._db.default_model_id,
+                stage=stage,
+                split=result.split,
+                eval_payload={"report_id": report_id, "content": content},
+            )
         return report_id
 
     def save_report_to_db(
@@ -734,29 +854,37 @@ class ReporterService:
         Returns the generated report_id (UUID string).
         Raises RuntimeError if no Database was provided at construction time.
         """
-        if self._db is None:
+        if self._report_repo is None:
             raise RuntimeError("No Database instance — pass db= when constructing ReporterService.")
 
         report_id = str(uuid.uuid4())
-        metrics = json.dumps({
-            "accuracy": result.accuracy,
-            "precision": result.precision,
-            "recall": result.recall,
-            "f1": result.f1,
-            "roc_auc": result.roc_auc,
-            "avg_precision": result.avg_precision,
-        })
-        artifacts = json.dumps({
-            "confusion_matrix": result.confusion_matrix,
-            "roc_curve_fpr": result.roc_curve_fpr,
-            "roc_curve_tpr": result.roc_curve_tpr,
+        content = {
+            "accuracy":              result.accuracy,
+            "precision":             result.precision,
+            "recall":                result.recall,
+            "f1":                    result.f1,
+            "roc_auc":               result.roc_auc,
+            "avg_precision":         result.avg_precision,
+            "confusion_matrix":      result.confusion_matrix,
+            "roc_curve_fpr":         result.roc_curve_fpr,
+            "roc_curve_tpr":         result.roc_curve_tpr,
             "classification_report": result.report,
-        })
-        self._db.execute(
-            "INSERT INTO reports (report_id, report_type, model_version, metrics, artifacts) "
-            "VALUES (?, ?, ?, ?, ?)",
-            [report_id, report_type, model_version, metrics, artifacts],
+        }
+        self._report_repo.insert_model_eval(
+            report_id=report_id,
+            report_type=report_type,
+            content=content,
+            model_version=model_version,
         )
+        if report_type == "PRE_PROD" and self._model_repo is not None:
+            self._model_repo.set_pre_prod_eval(
+                model_id=self._db.default_model_id,
+                eval_payload={
+                    "report_id":     report_id,
+                    "model_version": model_version,
+                    "content":       content,
+                },
+            )
         return report_id
 
     # ------------------------------------------------------------------
@@ -791,48 +919,43 @@ class ReporterService:
         )
 
     def _append_production_records(self, df: pl.DataFrame) -> None:
-        """Persist each row of a production batch to the DuckDB production_log."""
+        """Persist each row of a production batch to the ClickHouse production_log_buffer."""
         for row in df.to_dicts():
-            self._db.execute(
-                "INSERT INTO production_log (log_id, features) VALUES (?, ?)",
-                [str(uuid.uuid4()), json.dumps(row)],
-            )
+            self._production_log_repo.append(str(uuid.uuid4()), json.dumps(row))
 
     def _load_production_records(self) -> pl.DataFrame:
-        """Load all accumulated production records from DuckDB as a Polars DataFrame."""
-        rows = self._db.fetchall(
-            "SELECT features FROM production_log ORDER BY received_at"
-        )
+        """Load all accumulated production records from ClickHouse as a Polars DataFrame."""
+        rows = self._production_log_repo.fetch_all()
         if not rows:
             return pl.DataFrame()
         return pl.from_dicts([json.loads(r["features"]) for r in rows])
 
     def reset_production_log(self) -> int:
         """Delete all accumulated production records. Returns the row count deleted."""
-        count_row = self._db.fetchone("SELECT COUNT(*) AS n FROM production_log")
-        n = int(count_row["n"]) if count_row else 0
-        self._db.execute("DELETE FROM production_log")
+        n = self._production_log_repo.count()
+        self._production_log_repo.reset()
         return n
 
     def _load_latest_model_report(self) -> ModelEvaluationResult:
-        """Return the most-recent PRE_PROD report from DuckDB, or raise ValueError."""
-        row = self._db.fetchone(
-            "SELECT metrics, artifacts FROM reports "
-            "WHERE report_type = 'PRE_PROD' ORDER BY timestamp DESC LIMIT 1"
-        )
+        """Return the most-recent PRE_PROD report from PostgreSQL, or raise ValueError."""
+        row = self._report_repo.fetch_latest_pre_prod()
         if row is None:
             raise ValueError(
                 "No test parquet on disk and no stored evaluation found in the database. "
                 "POST labeled test records in the request body to run a fresh evaluation."
             )
-        metrics = json.loads(row["metrics"]) if isinstance(row["metrics"], str) else row["metrics"]
-        artifacts = json.loads(row["artifacts"]) if isinstance(row["artifacts"], str) else row["artifacts"]
+        content = json.loads(row["content"]) if isinstance(row["content"], str) else row["content"]
         return ModelEvaluationResult(
-            **metrics,
-            confusion_matrix=artifacts["confusion_matrix"],
-            roc_curve_fpr=artifacts.get("roc_curve_fpr", []),
-            roc_curve_tpr=artifacts.get("roc_curve_tpr", []),
-            report=artifacts["classification_report"],
+            accuracy=content["accuracy"],
+            precision=content["precision"],
+            recall=content["recall"],
+            f1=content["f1"],
+            roc_auc=content.get("roc_auc", 0.0),
+            avg_precision=content.get("avg_precision", 0.0),
+            confusion_matrix=content["confusion_matrix"],
+            roc_curve_fpr=content.get("roc_curve_fpr", []),
+            roc_curve_tpr=content.get("roc_curve_tpr", []),
+            report=content["classification_report"],
         )
 
     def _call_predict(self, instances: list[dict[str, Any]]) -> dict[str, Any]:

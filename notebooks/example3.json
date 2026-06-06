@@ -1,0 +1,14 @@
+{
+  "records": [
+    {"flow_duration": 180.0, "bytes_total": 38000, "pkts_total": 190, "rate": 211.1, "srate": 210.0, "drate": 4.5,  "min": 1200, "max": 15000, "avg": 5200.0, "std": 6800.0,  "proto": "0.86", "state": "na", "source": "ciciot"},
+    {"flow_duration": 220.0, "bytes_total": 42000, "pkts_total": 200, "rate": 190.9, "srate": 190.0, "drate": 4.8,  "min": 1800, "max": 22000, "avg": 7100.0, "std": 9200.0,  "proto": "0.86", "state": "na", "source": "ciciot"},
+    {"flow_duration": 150.0, "bytes_total": 32000, "pkts_total": 175, "rate": 213.3, "srate": 212.0, "drate": 4.2,  "min": 900,  "max": 12000, "avg": 4200.0, "std": 5500.0,  "proto": "0.86", "state": "na", "source": "unsw"},
+    {"flow_duration": 240.0, "bytes_total": 43800, "pkts_total": 205, "rate": 182.5, "srate": 181.0, "drate": 4.9,  "min": 2200, "max": 25000, "avg": 8000.0, "std": 10500.0, "proto": "0.86", "state": "na", "source": "ciciot"},
+    {"flow_duration": 200.0, "bytes_total": 40000, "pkts_total": 195, "rate": 200.0, "srate": 199.0, "drate": 4.6,  "min": 1500, "max": 18000, "avg": 6000.0, "std": 8000.0,  "proto": "0.86", "state": "na", "source": "unsw"},
+    {"flow_duration": 255.0, "bytes_total": 44500, "pkts_total": 209, "rate": 174.5, "srate": 173.0, "drate": 4.95, "min": 2500, "max": 28000, "avg": 9000.0, "std": 12000.0, "proto": "0.86", "state": "na", "source": "ciciot"},
+    {"flow_duration": 170.0, "bytes_total": 35000, "pkts_total": 185, "rate": 205.9, "srate": 205.0, "drate": 4.3,  "min": 1100, "max": 14000, "avg": 4800.0, "std": 6200.0,  "proto": "0.86", "state": "na", "source": "unsw"},
+    {"flow_duration": 190.0, "bytes_total": 39000, "pkts_total": 192, "rate": 205.3, "srate": 204.0, "drate": 4.4,  "min": 1400, "max": 17000, "avg": 5500.0, "std": 7300.0,  "proto": "0.86", "state": "na", "source": "ciciot"},
+    {"flow_duration": 230.0, "bytes_total": 43000, "pkts_total": 203, "rate": 187.0, "srate": 186.0, "drate": 4.7,  "min": 2000, "max": 23000, "avg": 7600.0, "std": 9900.0,  "proto": "0.86", "state": "na", "source": "unsw"},
+    {"flow_duration": 165.0, "bytes_total": 34000, "pkts_total": 182, "rate": 206.1, "srate": 205.0, "drate": 4.2,  "min": 1050, "max": 13500, "avg": 4600.0, "std": 5900.0,  "proto": "0.86", "state": "na", "source": "ciciot"}
+  ]
+}

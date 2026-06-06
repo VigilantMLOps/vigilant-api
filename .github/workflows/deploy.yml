@@ -1,0 +1,36 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    tags:
+      - 'deploy.api.*'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load SSH key into agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VM_SSH_KEY }}
+
+      - name: Show loaded key fingerprint
+        run: ssh-add -l
+
+      - name: Add VM to known_hosts
+        run: ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} bash -s <<EOF
+          set -euo pipefail
+          cd ~/vigilant-api
+          git fetch --all --tags
+          git checkout "$REF"
+          docker compose --profile prod build api caddy
+          docker compose --profile prod up -d
+          docker image prune -f
+          EOF

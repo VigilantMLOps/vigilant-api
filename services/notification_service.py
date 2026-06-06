@@ -1,13 +1,13 @@
-"""Notification service — structured alert dispatch with DuckDB persistence."""
+"""Notification service — structured alert dispatch with ClickHouse persistence."""
 from __future__ import annotations
 
-import json
 import uuid
 from enum import Enum
 from typing import Any
 
 from core.database import db
 from core.logger import get_logger
+from repositories import AlertRepository
 
 _logger = get_logger("vigilant.notifications")
 
@@ -60,10 +60,5 @@ def _persist(
     level: AlertLevel,
     metadata: dict[str, Any],
 ) -> None:
-    db.execute(
-        """
-        INSERT INTO alerts (alert_id, level, message, metadata)
-        VALUES (?, ?, ?, ?)
-        """,
-        [alert_id, level.value, message, json.dumps(metadata)],
-    )
+    event_type = metadata.get("event_type", "")
+    AlertRepository(db).create(alert_id, level.value, event_type, message, metadata)

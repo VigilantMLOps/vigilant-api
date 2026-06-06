@@ -1,8 +1,8 @@
-"""Drift detection service — PSI-based checks against DuckDB-stored baselines."""
+"""Drift detection service — PSI-based checks against PostgreSQL-stored baselines."""
 from __future__ import annotations
 
-import json
 import math
+import uuid
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -13,6 +13,7 @@ import polars as pl
 from pydantic import BaseModel, Field
 
 from core.logger import get_logger
+from repositories import DriftResultRepository, FeatureStatsRepository
 from services.alerting_engine import AlertManager
 
 _logger = get_logger("vigilant.drift")
@@ -40,7 +41,7 @@ class DriftDetector:
     """
     Computes PSI between incoming production batches and stored reference baselines.
 
-    Reference distributions live in the `feature_stats` DuckDB table.
+    Reference distributions live in the PostgreSQL `feature_stats` table.
     Raises ValueError when the table is empty — run scripts/init_baseline.py first.
 
     PSI thresholds:  < 0.10 → OK  |  0.10–0.25 → WARNING  |  ≥ 0.25 → CRITICAL
@@ -53,13 +54,20 @@ class DriftDetector:
     ) -> None:
         self._db = db
         self._alert_manager = alert_manager
+        self._feature_stats_repo = FeatureStatsRepository(db) if db is not None else None
+        self._drift_result_repo = DriftResultRepository(db) if db is not None else None
 
     def check_drift(self, current_df: pl.DataFrame) -> DriftCheckResult:
-        """Main entry point — fetches baseline from DuckDB then runs drift calculation.
+        """Main entry point — fetches baseline from PostgreSQL then runs drift calculation.
 
         Raises ValueError if the feature_stats table is empty.
         """
         baseline_stats = self._fetch_baseline_stats()
+        _logger.info(
+            "Drift check | n_baseline_features={} | n_production_rows={}",
+            len(baseline_stats),
+            len(current_df),
+        )
         return self.calculate_drift(current_df, baseline_stats)
 
     def calculate_drift(
@@ -67,7 +75,7 @@ class DriftDetector:
     ) -> DriftCheckResult:
         """Compare current_df against pre-loaded baseline_stats.
 
-        baseline_stats: mapping of feature_name → stats dict as stored in DuckDB.
+        baseline_stats: mapping of feature_name → stats dict as stored in PostgreSQL.
         """
         feature_results: list[FeatureDriftResult] = []
         alerts_fired: list[str] = []
@@ -103,6 +111,12 @@ class DriftDetector:
             _logger.info(
                 "Drift | feature={} | psi={:.6f} | status={}", feature_name, psi, status
             )
+
+            if self._drift_result_repo is not None:
+                self._drift_result_repo.insert(
+                    str(uuid.uuid4()), feature_name, self._db.default_model_id,
+                    "psi", psi, status, len(current_df),
+                )
 
             if status != "OK":
                 if _severity_rank(status) > _severity_rank(worst_status):
@@ -140,21 +154,13 @@ class DriftDetector:
         Raises ValueError if the table is empty.
         Raises RuntimeError if no Database was provided at construction time.
         """
-        if self._db is None:
+        if self._feature_stats_repo is None:
             raise RuntimeError("DriftDetector requires a Database instance.")
-        rows = self._db.fetchall(
-            "SELECT feature_name, stats_json FROM feature_stats"
-        )
-        if not rows:
+        result = self._feature_stats_repo.fetch_all()
+        if not result:
             raise ValueError(
                 "Baseline statistics not found in database. Please run init_baseline.py first."
             )
-        result: dict[str, dict] = {}
-        for row in rows:
-            stats = row["stats_json"]
-            if isinstance(stats, str):
-                stats = json.loads(stats)
-            result[row["feature_name"]] = stats
         return result
 
     @staticmethod

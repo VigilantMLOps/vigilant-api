@@ -31,3 +31,9 @@ htmlcov/
 
 # OS
 .DS_Store
+
+# Database snapshots — produced by `make db-dump`, transferred via scp
+snapshots/
+
+# Runtime logs
+core/logs/*.log

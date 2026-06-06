@@ -8,6 +8,7 @@ import yaml
 
 from core.database import db
 from core.logger import get_logger
+from repositories import IncidentRepository
 
 _logger = get_logger("vigilant.dispatcher")
 _PROCEDURES_PATH = Path(__file__).parent.parent / "core" / "procedures.yaml"
@@ -45,7 +46,7 @@ class DispatcherService:
     def process_incident(self, incident_id: str, event_type: str) -> None:
         """Dispatch an incident based on its event_type procedure.
 
-        Updates the incident status in DuckDB and logs the outcome.
+        Updates the incident status in PostgreSQL and logs the outcome.
         """
         procedure = self._procedures.get(event_type)
         if procedure is None:
@@ -91,10 +92,10 @@ class DispatcherService:
         handler()
 
     def _refetch_db(self) -> None:
-        """Cycle the DuckDB connection to recover from a stale or locked state."""
+        """Re-establish both database connections to recover from a stale state."""
         db.shutdown()
         db.startup()
-        _logger.info("REFETCH_DB: DuckDB connection refreshed")
+        _logger.info("REFETCH_DB: database connections refreshed")
 
     def _refetch_schema(self) -> None:
         """Reload the ML feature schema from disk to clear any cached skew."""
@@ -103,7 +104,4 @@ class DispatcherService:
         _logger.info("REFETCH_SCHEMA: feature schema reloaded from disk")
 
     def _update_status(self, incident_id: str, status: str) -> None:
-        db.execute(
-            "UPDATE incidents SET status = ? WHERE incident_id = ?",
-            [status, incident_id],
-        )
+        IncidentRepository(db).update_status(incident_id, status)

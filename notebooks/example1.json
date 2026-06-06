@@ -1,0 +1,14 @@
+{
+  "records": [
+    {"flow_duration": 0.02, "bytes_total": 50,    "pkts_total": 9.5,  "rate": 0.0,    "srate": 0.0,    "drate": 0.0, "min": 0.0,  "max": 0.0,   "avg": 0.0,  "std": 0.0, "proto": "na",   "state": "ACC", "source": "ciciot"},
+    {"flow_duration": 0.05, "bytes_total": 54,    "pkts_total": 9.5,  "rate": 0.0,    "srate": 0.0,    "drate": 0.0, "min": 0.0,  "max": 0.0,   "avg": 0.0,  "std": 0.0, "proto": "na",   "state": "na",  "source": "unsw"},
+    {"flow_duration": 0.10, "bytes_total": 54,    "pkts_total": 9.5,  "rate": 0.0,    "srate": 0.0,    "drate": 0.0, "min": 0.0,  "max": 0.0,   "avg": 0.0,  "std": 0.0, "proto": "6.0",  "state": "ACC", "source": "ciciot"},
+    {"flow_duration": 0.30, "bytes_total": 54,    "pkts_total": 9.5,  "rate": 0.0,    "srate": 0.0,    "drate": 0.0, "min": 0.0,  "max": 0.0,   "avg": 0.0,  "std": 0.0, "proto": "17.0", "state": "ACC", "source": "ciciot"},
+    {"flow_duration": 0.53, "bytes_total": 872,   "pkts_total": 9.5,  "rate": 0.0,    "srate": 0.0,    "drate": 0.0, "min": 54.0, "max": 54.0,  "avg": 54.0, "std": 0.0, "proto": "na",   "state": "na",  "source": "unsw"},
+    {"flow_duration": 0.40, "bytes_total": 870,   "pkts_total": 9.5,  "rate": 10.0,   "srate": 10.0,   "drate": 0.0, "min": 54.0, "max": 54.0,  "avg": 54.0, "std": 0.0, "proto": "na",   "state": "na",  "source": "unsw"},
+    {"flow_duration": 64.0, "bytes_total": 18700, "pkts_total": 82.0, "rate": 18.0,   "srate": 18.0,   "drate": 0.0, "min": 54.0, "max": 54.0,  "avg": 54.0, "std": 0.0, "proto": "na",   "state": "na",  "source": "ciciot"},
+    {"flow_duration": 64.0, "bytes_total": 19000, "pkts_total": 82.0, "rate": 0.0,    "srate": 0.0,    "drate": 0.0, "min": 54.0, "max": 97.0,  "avg": 59.0, "std": 3.0, "proto": "6.0",  "state": "na",  "source": "unsw"},
+    {"flow_duration": 64.5, "bytes_total": 40000, "pkts_total": 120.0,"rate": 500.0,  "srate": 500.0,  "drate": 0.0, "min": 54.0, "max": 97.0,  "avg": 59.0, "std": 3.0, "proto": "1.0",  "state": "na",  "source": "ciciot"},
+    {"flow_duration": 65.0, "bytes_total": 40500, "pkts_total": 120.0,"rate": 5000.0, "srate": 5000.0, "drate": 0.0, "min": 54.0, "max": 200.0, "avg": 59.0, "std": 5.0, "proto": "na",   "state": "na",  "source": "unsw"}
+  ]
+}

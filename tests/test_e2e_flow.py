@@ -4,7 +4,7 @@ Flow under test
 ---------------
 POST /api/v1/reporter/evaluate-drift  (60 drifted records)
     → ReporterService._append_production_records()  →  rows written to production_log
-    → evaluate_data_drift()                         →  per-feature PSI/KS/Chi² checks
+    → evaluate_data_drift()                         →  per-feature PSI checks via DriftDetector
     → AlertManager.trigger_alert()                  →  row written to incidents table
     → notification_service.send_alert()             →  row written to alerts table
                                                     →  loguru ALERT line emitted
@@ -16,22 +16,23 @@ import io
 import json
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from loguru import logger as loguru_logger
 
-from core.database import Database
 from main import app
 from services.alerting_engine import AlertManager
 from services.data_loader import DataPaths, RawDataPaths
 from services.reporter import ModelAPIConfig, ReporterConfig, ReporterService
+from tests.fake_database import FakeDatabase
 
 _DUMMY = Path("/tmp")
 
 # ---------------------------------------------------------------------------
-# Reference distribution — mirrors the test records used across the test suite
+# Reference distribution
 # ---------------------------------------------------------------------------
 
 _REFERENCE_RECORDS = [
@@ -48,9 +49,7 @@ _REFERENCE_RECORDS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Drifted payload — 60 records (≥ _MIN_PSI_SAMPLES=50 in reporter.py) with
-# numeric values ~1000× larger and unseen categorical labels so every feature
-# type (numeric PSI+KS and categorical PSI+Chi²) reliably triggers drift.
+# Drifted payload — 60 records (≥ _MIN_PSI_SAMPLES=50)
 # ---------------------------------------------------------------------------
 
 _DRIFTED_UNIT = [
@@ -68,23 +67,66 @@ _DRIFTED_UNIT = [
 
 _DRIFTED_RECORDS = _DRIFTED_UNIT * 6  # 60 rows — above _MIN_PSI_SAMPLES=50
 
+# Categorical features that DriftDetector will handle as distributions.
+_CATEGORICAL = {"proto", "state", "source"}
+
+# Numeric features (all columns not categorical).
+_NUMERIC = {k for k in _REFERENCE_RECORDS[0] if k not in _CATEGORICAL}
+
+
+def _seed_feature_stats(db: FakeDatabase) -> None:
+    """Populate models.baseline with feature stats computed from _REFERENCE_RECORDS.
+
+    DriftDetector._fetch_baseline_stats() reads from models.baseline (via
+    FeatureStatsRepository → ModelRepository) and requires at least one
+    feature or it raises ValueError. The baselines are computed from the
+    reference distribution so drift against the drifted payload is
+    guaranteed to fire.
+    """
+    ref_df = pl.DataFrame(_REFERENCE_RECORDS)
+    baseline: dict[str, dict] = {}
+
+    for col in _NUMERIC:
+        arr = ref_df[col].cast(pl.Float64, strict=False).fill_null(0.0).to_numpy()
+        counts, bin_edges = np.histogram(arr, bins=10)
+        baseline[col] = {
+            "type": "numeric",
+            "histogram": {"bins": bin_edges.tolist(), "counts": counts.tolist()},
+        }
+
+    for col in _CATEGORICAL:
+        series = ref_df[col].cast(pl.Utf8)
+        total = series.len()
+        vc = series.value_counts(sort=True)
+        val_col, cnt_col = vc.columns[0], vc.columns[1]
+        distribution = {
+            str(row[val_col]): round(row[cnt_col] / total, 8)
+            for row in vc.iter_rows(named=True)
+        }
+        baseline[col] = {"type": "categorical", "distribution": distribution}
+
+    db.execute(
+        "UPDATE models SET baseline = ? WHERE model_id = ?",
+        [json.dumps(baseline), db.default_model_id],
+    )
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-
 @pytest.fixture
-def e2e_db() -> Database:
-    """Fresh in-memory DuckDB with full schema, isolated per test."""
-    db = Database(":memory:")
+def e2e_db() -> FakeDatabase:
+    """In-memory database seeded with feature_stats baselines, isolated per test."""
+    db = FakeDatabase()
     db.startup()
+    _seed_feature_stats(db)
     yield db
     db.shutdown()
 
 
 @pytest.fixture
-def e2e_reporter(e2e_db: Database) -> ReporterService:
+def e2e_reporter(e2e_db: FakeDatabase) -> ReporterService:
     """ReporterService wired to the in-memory DB with an attached AlertManager."""
     config = ReporterConfig(
         data=DataPaths(
@@ -93,7 +135,7 @@ def e2e_reporter(e2e_db: Database) -> ReporterService:
             blacklist=_DUMMY / "blacklist.parquet",
         ),
         model_api=ModelAPIConfig(base_url="http://localhost:9999"),
-        categorical_columns=["proto", "state", "source"],
+        categorical_columns=list(_CATEGORICAL),
         target_column="target",
     )
     return ReporterService(
@@ -104,16 +146,8 @@ def e2e_reporter(e2e_db: Database) -> ReporterService:
 
 
 @pytest_asyncio.fixture
-async def e2e_client(e2e_db: Database, e2e_reporter: ReporterService, monkeypatch):
-    """AsyncClient wired to the FastAPI app with all services pointing at e2e_db.
-
-    Patches applied:
-      - reporter._reporter       → e2e_reporter (skips disk-based config + file DB)
-      - reporter._loader.load_reference → in-memory reference DataFrame
-      - notification_service.db  → e2e_db (alert rows land in the test DB)
-      - main._alert_manager      → AlertManager(e2e_db) (middleware incidents too)
-      - core.database.db lifecycle → no-ops (prevents file-backed DB from opening)
-    """
+async def e2e_client(e2e_db: FakeDatabase, e2e_reporter: ReporterService, monkeypatch):
+    """AsyncClient wired to the FastAPI app with all services pointing at e2e_db."""
     import api.v1.reporter as reporter_module
     import core.database
     import main as main_module
@@ -137,7 +171,6 @@ async def e2e_client(e2e_db: Database, e2e_reporter: ReporterService, monkeypatc
 # Tests
 # ---------------------------------------------------------------------------
 
-
 async def test_drifted_payload_triggers_full_pipeline(e2e_client, e2e_db):
     """Posting 60 drifted records must propagate through the entire pipeline.
 
@@ -155,8 +188,6 @@ async def test_drifted_payload_triggers_full_pipeline(e2e_client, e2e_db):
             "/api/v1/reporter/evaluate-drift",
             json={"records": _DRIFTED_RECORDS},
         )
-        # Drift detection is synchronous within the HTTP request; yield control
-        # once so any deferred coroutines (e.g. middleware) can complete.
         await asyncio.sleep(0)
     finally:
         loguru_logger.remove(sink_id)
@@ -175,7 +206,6 @@ async def test_drifted_payload_triggers_full_pipeline(e2e_client, e2e_db):
     assert len(log_rows) == len(_DRIFTED_RECORDS), (
         f"Expected {len(_DRIFTED_RECORDS)} rows in production_log, got {len(log_rows)}"
     )
-    # Spot-check the first three rows: JSON must round-trip with the expected keys.
     expected_keys = {"flow_duration", "bytes_total", "pkts_total", "rate", "state"}
     for row in log_rows[:3]:
         features = json.loads(row["features"])
@@ -205,7 +235,7 @@ async def test_drifted_payload_triggers_full_pipeline(e2e_client, e2e_db):
     # ── 4. Logger captured the full journey ───────────────────────────────────
     captured = log_buffer.getvalue()
     assert "Drift check" in captured, (
-        "Logger must emit 'Drift check' lines from ReporterService.evaluate_data_drift()"
+        "Logger must emit 'Drift check' lines from DriftDetector.check_drift()"
     )
     assert "[ALERT:" in captured, (
         "Logger must emit [ALERT:...] lines from notification_service.send_alert()"

@@ -1,4 +1,4 @@
-"""Alerting engine — incident lifecycle management backed by DuckDB."""
+"""Alerting engine — incident lifecycle management backed by PostgreSQL."""
 from __future__ import annotations
 
 import uuid
@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from core.database import Database
 
 from core.logger import get_logger
+from repositories import IncidentRepository
 from services.notification_service import AlertLevel, send_alert
 
 _logger = get_logger("vigilant.alerting")
@@ -21,7 +22,7 @@ class AlertManager:
     """
 
     def __init__(self, db: Database | None = None) -> None:
-        self._db = db
+        self._incident_repo = IncidentRepository(db) if db is not None else None
 
     def trigger_alert(
         self,
@@ -35,12 +36,8 @@ class AlertManager:
         metadata = metadata or {}
         severity_upper = severity.upper()
 
-        if self._db is not None:
-            self._db.execute(
-                "INSERT INTO incidents (incident_id, severity, incident_type, description) "
-                "VALUES (?, ?, ?, ?)",
-                [incident_id, severity_upper, event_type, description],
-            )
+        if self._incident_repo is not None:
+            self._incident_repo.create(incident_id, severity_upper, event_type, description)
             _logger.debug("Incident persisted | id={} | type={}", incident_id, event_type)
 
         send_alert(
