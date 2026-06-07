@@ -28,7 +28,7 @@ jobs:
           ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} bash -s <<EOF
           set -euo pipefail
           cd ~/vigilant-api
-          git fetch --all --tags
+          git fetch --all --tags --force
           git checkout "$REF"
           docker compose --profile prod build api caddy
           docker compose --profile prod up -d

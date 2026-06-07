@@ -69,7 +69,8 @@ Stop with `make down`.
 | `CLICKHOUSE_USER` | `default` | ClickHouse user |
 | `CLICKHOUSE_PASSWORD` | (empty) | ClickHouse password |
 | `DATA_DIR` | `../vigilant-mlops/artifacts/data` | Host path mounted at `/data` in the api container |
-| `CADDY_DOMAIN` | (unset) | Domain Caddy terminates TLS for (e.g. `vigilant-api.duckdns.org`); only used when the `prod` compose profile is active |
+| `CADDY_DOMAIN` | (unset) | Domain Caddy terminates TLS for the api (e.g. `vigilant-api.duckdns.org`); only used when the `prod` compose profile is active |
+| `CADDY_UI_DOMAIN` | (unset) | Domain Caddy terminates TLS for the UI, reverse-proxied to host port 8080 (e.g. `vigilant-ui.duckdns.org`); only used when the `prod` compose profile is active |
 
 A minimal local `.env`:
 
