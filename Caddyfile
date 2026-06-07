@@ -6,3 +6,12 @@
         format console
     }
 }
+
+{$CADDY_UI_DOMAIN} {
+    reverse_proxy host.docker.internal:8080
+    encode gzip
+    log {
+        output stdout
+        format console
+    }
+}
