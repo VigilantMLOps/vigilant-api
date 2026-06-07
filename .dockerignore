@@ -1,0 +1,44 @@
+# Database snapshots (multi-GB tarballs used for transfer + restore, not runtime)
+snapshots/
+
+# Local secrets
+.env
+.env.local
+.env.*.local
+
+# VCS / IDE
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+
+# Python build / cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+
+# Tests & notebooks aren't needed at runtime
+tests/
+notebooks/
+
+# Docs
+*.md
+LICENSE
+
+# Logs
+core/logs/*.log
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
