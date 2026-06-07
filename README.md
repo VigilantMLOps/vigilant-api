@@ -30,10 +30,12 @@ FastAPI backend for the Vigilant MLOps platform. Provides endpoints for ML model
 ## Quick Start (Local)
 
 ```bash
-cp .env.example .env   # if present; otherwise create a minimal .env (see below)
+cp .env.example .env   # fill in any values you want to override
 make up                # builds and starts postgres, clickhouse, and the api
 make logs SERVICE=api  # tail the api logs
 ```
+
+The api container's entrypoint applies any pending migrations (`python -m core.db_manager init`) before `uvicorn` starts, so a fresh stack comes up at the latest schema version without manual steps.
 
 API is reachable at `http://localhost:8000`. Interactive docs at `/docs` (Swagger) and `/redoc`.
 
@@ -74,7 +76,8 @@ Stop with `make down`.
 | `CLICKHOUSE_USER` | `default` | ClickHouse user |
 | `CLICKHOUSE_PASSWORD` | (empty) | ClickHouse password |
 | `DATA_DIR` | `../vigilant-mlops/artifacts/data` | Host path mounted at `/data` in the api container |
-| `CADDY_DOMAIN` | (unset) | Domain Caddy terminates TLS for (e.g. `vigilant-api.duckdns.org`); only used when the `prod` compose profile is active |
+| `CADDY_DOMAIN` | (unset) | Domain Caddy terminates TLS for the api (e.g. `vigilant-api.duckdns.org`); only used when the `prod` compose profile is active |
+| `CADDY_UI_DOMAIN` | (unset) | Domain Caddy terminates TLS for the UI, reverse-proxied to host port 8080 (e.g. `vigilant-ui.duckdns.org`); only used when the `prod` compose profile is active |
 
 A minimal local `.env`:
 
@@ -106,12 +109,12 @@ DATA_DIR=/tmp
 
 ## Database Migrations
 
-PostgreSQL, ClickHouse, and the Python migration runner are version-tracked together in `schema_migrations`. New migrations:
+PostgreSQL, ClickHouse, and the Python migration runner are version-tracked together in `schema_migrations`. Pending migrations are applied automatically when the api container starts (via `entrypoint.sh`); the Makefile targets are for the host-side dev workflow.
 
 ```bash
 make migration NAME=add_some_table   # scaffold v00X_add_some_table_pg.sql, _ch.sql, .py
 # edit the files...
-make db-init                          # apply all pending versions
+make db-init                          # apply all pending versions (idempotent)
 make db-status                        # confirm
 ```
 
@@ -129,6 +132,12 @@ make test
 All 23 tests run against an in-memory SQLite `FakeDatabase` — no PostgreSQL or ClickHouse needed. The suite covers route handlers (`httpx.AsyncClient` + ASGI transport), service logic, repository contracts, and a full end-to-end drift pipeline. Total runtime: ~0.1s.
 
 ## Seeding and Snapshots
+
+`make seed` drives the api through `evaluate-data` → `evaluate-model` → `evaluate-drift`, so a few prerequisites must be in place locally:
+
+- the stack must be running (`make up`)
+- the **ml-serve** model service must be reachable at `MODEL_API_URL` (the seed script can start a local checkout at the path configured in `config/seed.json`)
+- the raw datasets referenced by `config/reporter.json` must exist at `DATA_DIR`
 
 Two-step flow for getting realistic data onto a fresh instance (local or remote):
 
@@ -217,8 +226,15 @@ scripts/
 ├── db_snapshot.sh   # docker volume dump / restore for both DBs
 ├── migration.py     # Scaffold a new migration
 └── init_baseline.py # Compute per-feature baselines from a training file
+notebooks/           # Drift payload fixtures used by scripts/seed.py
 tests/               # pytest suite; uses FakeDatabase (SQLite) — no real DB required
 .github/workflows/   # CI/CD (tag-triggered deploy to the Oracle VM)
 Caddyfile            # HTTPS reverse proxy (prod compose profile)
 docker-compose.yml   # postgres + clickhouse + api (+ caddy under prod profile)
+Dockerfile           # Python 3.12-slim image build for the api service
+entrypoint.sh        # Container entrypoint — runs migrations then launches uvicorn
+.env.example         # Template for the .env consumed by docker compose
+pyproject.toml       # Poetry project metadata + dependencies
+poetry.lock          # Pinned dependency tree
+main.py              # FastAPI app factory + router registration
 ```

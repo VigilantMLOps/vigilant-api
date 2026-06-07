@@ -74,6 +74,12 @@ services:
       - caddy_config:/config
     environment:
       - CADDY_DOMAIN=${CADDY_DOMAIN:-}
+      - CADDY_UI_DOMAIN=${CADDY_UI_DOMAIN:-}
+    # The UI is deployed by a separate compose stack (vigilant-ui) and
+    # publishes port 8080 on the host. host.docker.internal:host-gateway
+    # gives this container a route to that host port from inside Docker.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - api
     profiles: ["prod"]
