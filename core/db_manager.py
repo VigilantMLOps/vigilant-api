@@ -89,6 +89,14 @@ MIGRATIONS: list[Migration] = [
         ch_sql=_BASE / "database" / "clickhouse" / "migrations" / "v004_model_identity_ch.sql",
         runner="core.database.migrations.v004_model_identity:run",
     ),
+    Migration(
+        version=5,
+        description=(
+            "RAG observability: add query_text, query_mode, n_retrieved, top_retrieval_score,"
+            " retrieval_latency_ms, generation_latency_ms, sources, prompt_version to llm_traces"
+        ),
+        ch_sql=_BASE / "database" / "clickhouse" / "migrations" / "v005_rag_traces_ch.sql",
+    ),
 ]
 
 
