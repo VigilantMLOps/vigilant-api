@@ -25,6 +25,7 @@ _CLICKHOUSE_TABLES = frozenset({
     "drift_results",
     "report_metrics",
     "llm_traces",
+    "login_events",
 })
 
 # Matches the first table name in any DML statement.

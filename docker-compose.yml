@@ -39,6 +39,39 @@ services:
         soft: 262144
         hard: 262144
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  vigilant-detect:
+    build: ../vigilant-detect
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=vigilant
+      - POSTGRES_USER=vigilant
+      - POSTGRES_PASSWORD=vigilant
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=vigilant
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VIGILANT_API_URL=${VIGILANT_API_URL:-http://api:8000}
+      - PORT=8001
+    volumes:
+      - detect_models:/app/models
+      - detect_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   api:
     build: .
     restart: unless-stopped
@@ -48,19 +81,16 @@ services:
     environment:
       - POSTGRES_HOST=postgres
       - CLICKHOUSE_HOST=clickhouse
-      # ml-serve runs on the host (legacy vigilant-mlops repo) — use the
-      # Docker-provided host DNS name to reach it from inside the container.
-      - MODEL_API_URL=http://host.docker.internal:8001
+      - MODEL_API_URL=${MODEL_API_URL:-http://host.docker.internal:8001}
     volumes:
-      # Mount the dataset directory expected by config/reporter.json (/data/...).
-      # Override the host path via DATA_DIR in .env if the legacy repo lives
-      # elsewhere on your machine.
       - ${DATA_DIR:-../vigilant-mlops/artifacts/data}:/data:ro
     depends_on:
       postgres:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+      vigilant-detect:
+        condition: service_started
 
   caddy:
     image: caddy:2-alpine
@@ -87,5 +117,8 @@ services:
 volumes:
   postgres_data:
   clickhouse_data:
+  redis_data:
+  detect_models:
+  detect_data:
   caddy_data:
   caddy_config:
