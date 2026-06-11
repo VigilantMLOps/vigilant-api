@@ -19,7 +19,7 @@ from starlette.responses import Response
 from core.database import db
 from core.logger import get_logger
 from services.alerting_engine import AlertManager
-from api.v1 import incidents, monitoring, reporter, telemetry
+from api.v1 import incidents, monitoring, reporter, telemetry, events
 
 logger = get_logger("vigilant.app")
 _logger = get_logger("vigilant.middleware")
@@ -109,6 +109,7 @@ def health_check():
     return {"status": "healthy", "service": "vigilant-api"}
 
 
+app.include_router(events.router, prefix="/api/v1", tags=["Events"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
 app.include_router(incidents.router, prefix="/api/v1", tags=["Monitoring"])
 app.include_router(reporter.router, prefix="/api/v1", tags=["Data"])

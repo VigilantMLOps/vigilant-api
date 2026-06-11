@@ -167,6 +167,41 @@ SETTINGS index_granularity = 8192;
 
 
 -- ---------------------------------------------------------------------------
+-- login_events
+-- Raw login event ingestion log — written by POST /api/v1/events/login.
+-- One row per login attempt. Stores the raw event + the decision returned
+-- by vigilant-detect. Used for audit trail, replay, and drift monitoring.
+-- TTL: 90 days.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS login_events (
+    event_id            UUID                        DEFAULT generateUUIDv4(),
+    received_at         DateTime64(3, 'UTC')        DEFAULT now64(3),
+    user_id             String                      DEFAULT '',
+    session_id          String                      DEFAULT '',
+    ip_address          String                      DEFAULT '',
+    geo_country         LowCardinality(String)      DEFAULT '',
+    geo_lat             Nullable(Float32),
+    geo_lon             Nullable(Float32),
+    device_fingerprint  String                      DEFAULT '',
+    login_success       UInt8                       DEFAULT 0,
+    mfa_used            UInt8                       DEFAULT 0,
+    mfa_method          LowCardinality(String)      DEFAULT 'none',
+    login_duration_ms   Nullable(Float32),
+    decision            LowCardinality(String)      DEFAULT '',  -- ALLOW | CHALLENGE | BLOCK
+    risk_score          Float32                     DEFAULT 0,
+    context_flags       String                      DEFAULT '[]',  -- JSON array
+    model_version       LowCardinality(String)      DEFAULT '',
+    latency_ms          Float32                     DEFAULT 0
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMM(received_at)
+ORDER BY (user_id, received_at, event_id)
+TTL toDateTime(received_at) + INTERVAL 90 DAY DELETE
+SETTINGS index_granularity = 8192;
+
+
+-- ---------------------------------------------------------------------------
 -- llm_traces
 -- Inference observability for LLM deployments. New table.
 -- Captures the minimum signal for:
