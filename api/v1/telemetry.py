@@ -68,10 +68,13 @@ def ingest_rag_trace(payload: RagTracePayload) -> RagTraceResponse:
 
 
 @router.get("/telemetry/rag-traces", response_model=list[dict])
-def list_rag_traces(limit: int = 50) -> list[dict]:
-    """Return recent RAG traces for the vigilant-ui /rag dashboard page."""
+def list_rag_traces(limit: int = 50, since: str | None = None) -> list[dict]:
+    """Return recent RAG traces, optionally filtered by time window.
+
+    `since` is an ISO-8601 timestamp; only traces at or after this time are returned.
+    """
     try:
-        return _rag_repo.fetch_recent(limit=min(limit, 200))
+        return _rag_repo.fetch_recent(limit=min(limit, 200), since=since)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch traces: {exc}")
 
