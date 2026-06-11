@@ -617,21 +617,36 @@ class ReporterService:
 
         return result
 
+    def ingest_precomputed_metrics(
+        self,
+        y_true: list[int],
+        y_pred_proba: list[float],
+    ) -> ModelEvaluationResult:
+        """
+        Build a ModelEvaluationResult from pre-computed labels and probabilities.
+        Used by the /reporter/ingest-metrics endpoint (push from vigilant-detect).
+        Binary classification at threshold 0.5 for standard metrics; probabilities
+        used directly for ROC-AUC and average precision.
+        """
+        y_pred = [1 if p >= 0.5 else 0 for p in y_pred_proba]
+        y_prob = [[1 - p, p] for p in y_pred_proba]
+        return self._build_classification_result(y_true, y_pred, y_prob)
+
     # ------------------------------------------------------------------
     # Production — 1: Ongoing Data Evaluation (drift)
     # ------------------------------------------------------------------
 
     def evaluate_data_drift(
         self,
-        production_df: pl.DataFrame,
+        production_df: pl.DataFrame | None,
         model_version: str | None = None,
     ) -> DataDriftResult:
         """
         Compare production data against the reference distribution.
 
-        When a Database is attached: persists the batch to production_log,
-        then computes PSI against baselines stored in the feature_stats table
-        (populated by scripts/init_baseline.py). No reference parquet needed.
+        When a Database is attached: optionally persists the incoming batch to
+        production_log (skipped when production_df is None), then computes PSI
+        against baselines stored in the feature_stats table.
 
         When no Database is attached (e.g. unit tests): falls back to loading
         the reference parquet via DataLoader and running PSI + KS / Chi².
@@ -639,8 +654,14 @@ class ReporterService:
         model_version = model_version or self.config.model_api.model_version
 
         if self._db is not None:
-            self._append_production_records(production_df)
+            if production_df is not None and production_df.height > 0:
+                self._append_production_records(production_df)
             production_df = self._load_production_records()
+            if production_df.height == 0:
+                raise ValueError(
+                    "No production records in the log. Send records in the request body "
+                    "or use ?split=<name> to seed the evaluation."
+                )
             from services.drift_detector import DriftDetector as _DriftDetector
             detector = _DriftDetector(db=self._db, alert_manager=self._alert_manager)
             check = detector.check_drift(production_df)
@@ -848,6 +869,7 @@ class ReporterService:
         *,
         report_type: str = "PRE_PROD",
         model_version: str | None = None,
+        model_id: str | None = None,
     ) -> str:
         """
         Persist an evaluation result to the reports table.
@@ -870,15 +892,17 @@ class ReporterService:
             "roc_curve_tpr":         result.roc_curve_tpr,
             "classification_report": result.report,
         }
+        resolved_model_id = model_id or self._db.default_model_id
         self._report_repo.insert_model_eval(
             report_id=report_id,
             report_type=report_type,
             content=content,
+            model_id=resolved_model_id,
             model_version=model_version,
         )
         if report_type == "PRE_PROD" and self._model_repo is not None:
             self._model_repo.set_pre_prod_eval(
-                model_id=self._db.default_model_id,
+                model_id=resolved_model_id,
                 eval_payload={
                     "report_id":     report_id,
                     "model_version": model_version,

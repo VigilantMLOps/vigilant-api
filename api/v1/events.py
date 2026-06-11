@@ -54,6 +54,15 @@ class LoginEvent(BaseModel):
     mfa_used:           bool = False
     mfa_method:         Literal["none", "totp", "sms", "email"] = "none"
     login_duration_ms:  float | None = None
+    # Pre-computed offline features (passed through to vigilant-detect)
+    failed_attempts_7d:      float | None = None
+    distinct_ips_7d:         float | None = None
+    login_success_rate_30d:  float | None = None
+    avg_login_hour_7d:       float | None = None
+    account_age_days:        float | None = None
+    # Online feature overrides (passed through to vigilant-detect)
+    last_login_gap_h:        float | None = None
+    geo_distance_delta:      float | None = None
 
 
 class LoginDecision(BaseModel):

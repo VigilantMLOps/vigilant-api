@@ -65,13 +65,23 @@ class RagTraceRepository:
             ],
         )
 
-    def fetch_recent(self, limit: int = 50) -> list[dict]:
+    def fetch_recent(self, limit: int = 50, since: str | None = None) -> list[dict]:
+        where = "WHERE query_mode != ''"
+        if since:
+            # ClickHouse DateTime expects 'YYYY-MM-DD HH:MM:SS', not ISO 8601 with T/Z
+            since_safe = (
+                since.replace("'", "")
+                     .replace("T", " ")
+                     .replace("Z", "")
+                     .split(".")[0]
+            )
+            where += f" AND timestamp >= '{since_safe}'"
         return self._db.fetchall(
             "SELECT trace_id, timestamp, query_text, query_mode,"
             "  n_retrieved, top_retrieval_score, total_tokens,"
             "  latency_ms, retrieval_latency_ms, generation_latency_ms,"
             "  model_id, sources, prompt_version"
             " FROM llm_traces"
-            " WHERE query_mode != ''"
+            f" {where}"
             f" ORDER BY timestamp DESC LIMIT {limit}"
         )
